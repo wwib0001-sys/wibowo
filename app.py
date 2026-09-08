@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import numpy as np
 
 st.set_page_config(layout="wide")
-st.title("🏢 Occupancy‑Driven HVAC Backtest (Constant Outdoor Temp)")
+st.title("🏢 Occupancy‑Driven HVAC Backtest")
 
 @st.cache_data
 def load_data():
