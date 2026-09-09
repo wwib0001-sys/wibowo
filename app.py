@@ -7,18 +7,40 @@ from datetime import datetime, date, timedelta, time
 st.set_page_config(page_title="Live HVAC & Grid Simulator", layout="wide")
 st.title("🏢 LIVE: Occupancy HVAC & Grid Frequency Support")
 
-# --- CONTROL CENTRE INSTRUCTIONS (SIDEBAR) ---
+# --- LIVE TIME FEED ---
+st.sidebar.header("🔴 Live Time Feed")
+st.sidebar.write("Scrub through the day to simulate the passage of time.")
+# Create a dummy time index to generate options
+dummy_times = pd.date_range("00:00", "23:55", freq="5min").time
+current_time = st.sidebar.select_slider(
+    "Current Time of Day",
+    options=dummy_times,
+    value=time(14, 0) # Default to 2 PM
+)
+
+# --- CONTROL CENTRE INSTRUCTION (LIVE OVERRIDE) ---
+st.sidebar.markdown("---")
 st.sidebar.header("⚡ Grid Control Centre")
-st.sidebar.write("Simulate a frequency stabilization instruction to shed load.")
-grid_event_active = st.sidebar.checkbox("Issue Load Reduction Command", value=True)
-event_start_time = st.sidebar.time_input("Instruction Start", value=time(14, 0))
-event_end_time = st.sidebar.time_input("Instruction End", value=time(16, 0))
+st.sidebar.write("Issue an immediate command to stabilize grid frequency.")
+# Instant instruction toggle rather than schedulable times
+issue_load_shed = st.sidebar.toggle("🚨 Issue Immediate Load Shed Command", value=False)
 
 st.sidebar.markdown("---")
 st.sidebar.header("💰 Financials")
 energy_rate = st.sidebar.number_input("Electricity Rate ($/kWh)", value=0.15, step=0.01)
 
-# --- DUMMY DATA GENERATOR (REACTS TO GRID EVENT) ---
+# Calculate dynamic event window based on the live instruction
+today_date = date.today()
+if issue_load_shed:
+    event_start_time = current_time
+    # Instruction lasts for 1 hour from the moment it is issued
+    event_end_dt = datetime.combine(today_date, current_time) + timedelta(hours=1)
+    event_end_time = event_end_dt.time()
+else:
+    event_start_time = None
+    event_end_time = None
+
+# --- DUMMY DATA GENERATOR ---
 @st.cache_data(show_spinner=False)
 def generate_live_data(sim_date, grid_active, grid_start, grid_end):
     """Generates 5-minute interval dummy data reflecting live physical responses."""
@@ -41,36 +63,45 @@ def generate_live_data(sim_date, grid_active, grid_start, grid_end):
     # 2. Outdoor Temp (Peaks at 28C around 3 PM)
     df['outdoor_temp'] = 18 + 10 * np.sin(np.pi * (df.index.hour - 6) / 12)
 
-    # 3. Simulate Scheduled HVAC (Rigid baseline: Always ON 8am-6pm)
+    # 3. Simulate Scheduled HVAC (Rigid baseline)
     t_sched, p_sched = [], []
     curr_t = 20.0
     for i, t_stamp in enumerate(df.index):
         if 8 <= t_stamp.hour < 18:
-            curr_t = 23.5 + np.random.normal(0, 0.1) # Forces tight setpoint
-            p_sched.append(15.0 + np.random.normal(0, 0.5)) # High rigid power
+            curr_t = 23.5 + np.random.normal(0, 0.1) 
+            p_sched.append(15.0 + np.random.normal(0, 0.5)) 
         else:
-            curr_t += (df['outdoor_temp'].iloc[i] - curr_t) * 0.05 # Drifts naturally
+            curr_t += (df['outdoor_temp'].iloc[i] - curr_t) * 0.05 
             p_sched.append(0.0)
         t_sched.append(curr_t)
 
     df['T_true'] = t_sched
     df['power_true'] = np.maximum(0, p_sched)
 
-    # 4. Simulate Predictive HVAC (Responds to Occupancy AND Grid Instructions)
+    # 4. Simulate Predictive HVAC (Responds to Occupancy AND Live Instructions)
     t_pred, p_pred = [], []
     curr_t_pred = 20.0
     for i, t_stamp in enumerate(df.index):
         occ = df['occ_true'].iloc[i]
-        is_grid_event = grid_active and (grid_start <= t_stamp.time() <= grid_end)
         
+        # Check if the current time step falls within the live instruction window
+        if grid_active and grid_start and grid_end:
+            # Handle end-of-day wrap around for the 1-hour window
+            if grid_start <= grid_end:
+                is_grid_event = grid_start <= t_stamp.time() <= grid_end
+            else:
+                is_grid_event = t_stamp.time() >= grid_start or t_stamp.time() <= grid_end
+        else:
+            is_grid_event = False
+            
         if is_grid_event:
-            # GRID STABILIZATION: Shed load completely, allow temp to drift up
+            # GRID STABILIZATION OVERRIDE: Shed load completely
             curr_t_pred += (df['outdoor_temp'].iloc[i] - curr_t_pred) * 0.05
             p_pred.append(0.0)
         elif occ > 5:
             # Normal smart occupancy control
             curr_t_pred = 24.0 + np.random.normal(0, 0.2) 
-            p_pred.append(8.0 + np.random.normal(0, 1.0)) # Optimized lower power
+            p_pred.append(8.0 + np.random.normal(0, 1.0)) 
         else:
             # Unoccupied drift
             curr_t_pred += (df['outdoor_temp'].iloc[i] - curr_t_pred) * 0.05
@@ -81,33 +112,20 @@ def generate_live_data(sim_date, grid_active, grid_start, grid_end):
     df['power_pred'] = np.maximum(0, p_pred)
 
     # 5. Energy and Comfort Math
-    df['energy_interval_true'] = df['power_true'] * (5/60) # 5 mins in hours
+    df['energy_interval_true'] = df['power_true'] * (5/60) 
     df['energy_interval_pred'] = df['power_pred'] * (5/60)
     df['energy_true'] = df['energy_interval_true'].cumsum()
     df['energy_pred'] = df['energy_interval_pred'].cumsum()
     
-    # Comfort is only checked when Occupied (>0)
     df['scheduled_comfort_ok'] = np.where(df['occ_true'] > 0, (df['T_true'] >= 22.8) & (df['T_true'] <= 25.8), np.nan)
     df['predictive_comfort_ok'] = np.where(df['occ_true'] > 0, (df['T_pred'] >= 22.8) & (df['T_pred'] <= 25.8), np.nan)
 
     return df
 
-# Generate Data
-today_date = date.today()
+# Re-run generator dynamically if the instruction state or current time changes
 full_day_df = generate_live_data(
     datetime.combine(today_date, datetime.min.time()), 
-    grid_event_active, event_start_time, event_end_time
-)
-
-# --- LIVE SIMULATION CONTROLS ---
-st.sidebar.markdown("---")
-st.sidebar.header("🔴 Live Time Feed")
-st.sidebar.write("Scrub through the day to watch the live response.")
-time_options = full_day_df.index.time
-current_time = st.sidebar.select_slider(
-    "Current Time of Day",
-    options=time_options,
-    value=time(16, 30) # Default to after the grid event
+    issue_load_shed, event_start_time, event_end_time
 )
 
 # Filter to simulate "Live" data feed up to the slider time
@@ -126,8 +144,12 @@ def calc_live_metrics(data):
     if pd.isna(comf_pred): comf_pred = 1.0
     
     load_reduction = 0
-    if grid_event_active:
-        event_mask = (data.index.time >= event_start_time) & (data.index.time <= event_end_time)
+    if issue_load_shed and event_start_time and event_end_time:
+        if event_start_time <= event_end_time:
+            event_mask = (data.index.time >= event_start_time) & (data.index.time <= event_end_time)
+        else:
+            event_mask = (data.index.time >= event_start_time) | (data.index.time <= event_end_time)
+            
         event_data = data[event_mask]
         if not event_data.empty:
             load_reduction = event_data['power_true'].mean() - event_data['power_pred'].mean()
@@ -142,9 +164,9 @@ st.subheader(f"📊 System Status: **{today_date} | Time: {current_time}**")
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    if grid_event_active and current_time >= event_start_time:
+    if issue_load_shed:
         st.metric("⚡ Grid Frequency Support (Load Shed)", f"{load_reduction:.2f} kW", 
-                  help="Average power dropped during the control centre instruction.")
+                  help="Average power dropped since instruction was issued.")
     else:
         st.metric("⚡ Grid Frequency Support", "Standby")
 with col2:
@@ -173,17 +195,17 @@ def create_plot(data, y_true_col, y_pred_col, title, y_label, true_name, pred_na
     for hline in hlines:
         fig.add_hline(y=hline, line_dash="dot", line_color="gray")
         
-    # Lock X-axis to full 24 hours so charts don't resize dynamically
+    # Lock X-axis to full 24 hours
     full_day_start = datetime.combine(today_date, datetime.min.time())
     full_day_end = datetime.combine(today_date, time(23, 59))
         
-    if show_grid and grid_event_active:
+    if show_grid and issue_load_shed and event_start_time and event_end_time:
         event_start_dt = datetime.combine(today_date, event_start_time)
         event_end_dt = datetime.combine(today_date, event_end_time)
         fig.add_vrect(
             x0=event_start_dt, x1=event_end_dt,
             fillcolor="red", opacity=0.15, layer="below", line_width=0,
-            annotation_text="Grid Load Shed Instruction", annotation_position="top left"
+            annotation_text="ACTIVE INSTRUCTION", annotation_position="top left"
         )
         
     fig.update_layout(
