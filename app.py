@@ -4,13 +4,13 @@ import plotly.graph_objects as go
 import numpy as np
 
 st.set_page_config(layout="wide")
-st.title("🏢 Occupancy‑Driven HVAC Backtest")
+st.title("🏢 Occupancy-Driven HVAC Backtest Comparison")
 
 @st.cache_data
 def load_data():
-    # Try to load CSV
+    # Load the updated comparison CSV
     try:
-        df = pd.read_csv('backtest_hvac_constant_temp.csv')
+        df = pd.read_csv('backtest_hvac_comparison.csv')
     except Exception as e:
         st.error(f"Could not read CSV: {e}")
         raise
@@ -28,34 +28,17 @@ def load_data():
     # Sort index
     df = df.sort_index()
 
-    # REMOVED: df = df.dropna(subset=[df.index.name])
-    # (This was causing the KeyError)
-
-    # Map standard names to the columns present in your CSV
-    # Mapping for easy access
+    # Map standard names to the columns present in the comparison CSV
     df['occ_true'] = df['occupancy_actual']
     df['occ_pred'] = df['occupancy_predicted']
     
-    # Temperature: There is no separate predicted temperature in the CSV.
-    # We will use the actual room temperature for both, or you can replace
-    # with a simulated column if you add one later.
-    df['T_true'] = df['room_temperature_C']
-    df['T_pred'] = df['room_temperature_C']  # Assuming no pred, using actual
+    # Map Temperature (Scheduled Baseline vs Predictive)
+    df['T_true'] = df['scheduled_room_temperature_C']
+    df['T_pred'] = df['predictive_room_temperature_C']
     
-    # Energy: Use the cumulative energy column directly (Actual)
-    # If you have a predicted cumulative column, use that; otherwise, use the same.
-    if 'hvac_energy_cumulative_kWh' in df.columns:
-        df['energy_true'] = df['hvac_energy_cumulative_kWh']
-        # For now, use actual for predicted as well. If you have a separate pred column, map it here.
-        df['energy_pred'] = df['hvac_energy_cumulative_kWh']
-    else:
-        # Fallback: compute from interval if cumulative missing
-        if 'hvac_energy_interval_kWh' in df.columns:
-            df['energy_true'] = df['hvac_energy_interval_kWh'].cumsum()
-            df['energy_pred'] = df['hvac_energy_interval_kWh'].cumsum()
-        else:
-            st.error("No energy columns found in CSV!")
-            st.stop()
+    # Map Energy 
+    df['energy_true'] = df['scheduled_energy_cumulative_kWh']
+    df['energy_pred'] = df['predictive_energy_cumulative_kWh']
 
     return df
 
@@ -77,18 +60,18 @@ else:
 # Metrics
 col1, col2, col3 = st.columns(3)
 with col1:
-    # Calculate RMSE between T_pred and T_true (they are the same now)
+    # Calculate RMSE between Predictive Temp and Scheduled Temp
     rmse_temp = np.sqrt(np.mean((df_filtered['T_pred'] - df_filtered['T_true'])**2))
-    st.metric("Temperature RMSE", f"{rmse_temp:.2f} °C")
+    st.metric("Temperature RMSE (Pred vs Sched)", f"{rmse_temp:.2f} °C")
 with col2:
-    # Energy difference: Since we are using actual for both, this will be 0. Change if you have a true pred column.
+    # Energy difference: Negative means predictive saved energy
     energy_diff = df_filtered['energy_pred'].iloc[-1] - df_filtered['energy_true'].iloc[-1]
-    st.metric("Energy Difference (Pred - True)", f"{energy_diff:.2f} kWh")
+    st.metric("Energy Difference (Pred - Sched)", f"{energy_diff:.2f} kWh")
 with col3:
-    # Comfort violation for T_true (since T_pred is the same)
+    # Comfort violation
     comfort_true = ((df_filtered['T_true'] < 20) | (df_filtered['T_true'] > 26)).mean()
     comfort_pred = ((df_filtered['T_pred'] < 20) | (df_filtered['T_pred'] > 26)).mean()
-    st.metric("Comfort Violation (True)", f"{comfort_true*100:.1f}%")
+    st.metric("Comfort Violation (Sched)", f"{comfort_true*100:.1f}%")
     st.metric("Comfort Violation (Pred)", f"{comfort_pred*100:.1f}%")
 
 # Occupancy plot
@@ -102,9 +85,15 @@ fig_occ.update_layout(title="Occupancy Over Time", xaxis_title="Time", yaxis_tit
 # Temperature plot
 fig_temp = go.Figure()
 fig_temp.add_trace(go.Scatter(x=df_filtered.index, y=df_filtered['T_true'], 
-                              name='Actual Temp', line=dict(color='green')))
+                              name='Scheduled Temp', line=dict(color='green')))
 fig_temp.add_trace(go.Scatter(x=df_filtered.index, y=df_filtered['T_pred'], 
-                              name='Predicted Temp', line=dict(color='orange', dash='dash')))
+                              name='Predictive Temp', line=dict(color='orange', dash='dash')))
+
+# Also overlay outdoor temperature if it's available in the dataset for context
+if 'outdoor_temperature_C' in df_filtered.columns:
+    fig_temp.add_trace(go.Scatter(x=df_filtered.index, y=df_filtered['outdoor_temperature_C'], 
+                                  name='Outdoor Temp', line=dict(color='lightblue', dash='dot')))
+
 fig_temp.add_hline(y=20, line_dash="dot", line_color="gray", annotation_text="Comfort lower")
 fig_temp.add_hline(y=26, line_dash="dot", line_color="gray", annotation_text="Comfort upper")
 fig_temp.update_layout(title="Indoor Temperature", xaxis_title="Time", yaxis_title="Temperature (°C)")
@@ -112,9 +101,9 @@ fig_temp.update_layout(title="Indoor Temperature", xaxis_title="Time", yaxis_tit
 # Energy plot
 fig_energy = go.Figure()
 fig_energy.add_trace(go.Scatter(x=df_filtered.index, y=df_filtered['energy_true'], 
-                                name='Actual Energy', line=dict(color='purple')))
+                                name='Scheduled Energy', line=dict(color='purple')))
 fig_energy.add_trace(go.Scatter(x=df_filtered.index, y=df_filtered['energy_pred'], 
-                                name='Predicted Energy', line=dict(color='brown', dash='dash')))
+                                name='Predictive Energy', line=dict(color='brown', dash='dash')))
 fig_energy.update_layout(title="Cumulative HVAC Energy", xaxis_title="Time", yaxis_title="Energy (kWh)")
 
 # Show plots
@@ -122,7 +111,7 @@ st.plotly_chart(fig_occ, use_container_width=True)
 st.plotly_chart(fig_temp, use_container_width=True)
 st.plotly_chart(fig_energy, use_container_width=True)
 
-# Optional: scatter of predicted vs actual energy
+# Energy scatter
 st.subheader("Energy Scatter")
 fig_scatter = go.Figure()
 fig_scatter.add_trace(go.Scatter(x=df_filtered['energy_true'], y=df_filtered['energy_pred'], 
@@ -130,6 +119,6 @@ fig_scatter.add_trace(go.Scatter(x=df_filtered['energy_true'], y=df_filtered['en
 fig_scatter.add_trace(go.Scatter(x=[df_filtered['energy_true'].min(), df_filtered['energy_true'].max()],
                                  y=[df_filtered['energy_true'].min(), df_filtered['energy_true'].max()],
                                  mode='lines', name='Ideal', line=dict(dash='dash', color='red')))
-fig_scatter.update_layout(title="Predicted vs Actual Cumulative Energy", 
-                          xaxis_title="Actual Energy (kWh)", yaxis_title="Predicted Energy (kWh)")
+fig_scatter.update_layout(title="Predictive vs Scheduled Cumulative Energy", 
+                          xaxis_title="Scheduled Energy (kWh)", yaxis_title="Predictive Energy (kWh)")
 st.plotly_chart(fig_scatter, use_container_width=True)
