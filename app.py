@@ -10,8 +10,8 @@ st.title("🏢 LIVE: Grid-Interactive Efficient Building (GEB)")
 @st.cache_data
 def load_data():
     try:
-        # Load the updated CSV
-        df = pd.read_csv('backtest_hvac_comparison (1).csv')
+        # 1. Load the LATEST uploaded CSV
+        df = pd.read_csv('hvac_comparison_latest.csv')
     except Exception as e:
         st.error(f"Could not read CSV: {e}")
         st.stop()
@@ -22,10 +22,10 @@ def load_data():
 
     df = df.sort_index()
 
-    # Base Mappings to the NEW column names
+    # 2. Base Mappings to the NEW column names
     df['occ_true'] = df['occupancy_now']
-    df['occ_pred_30m'] = df['occupancy_forecast_30min']
-    df['occ_actual_30m'] = df['occupancy_actual_30min_later']
+    df['occ_pred_15m'] = df['occupancy_forecast_15min']
+    df['occ_actual_15m'] = df['occupancy_actual_15min_later']
     
     df['T_true'] = df['scheduled_room_temperature_C']
     df['T_pred'] = df['predictive_room_temperature_C']
@@ -33,8 +33,9 @@ def load_data():
     df['power_true'] = df['scheduled_hvac_power_kW']
     df['power_pred_base'] = df['predictive_hvac_power_kW']
     
-    df['energy_interval_true'] = df['scheduled_energy_interval_kWh']
-    df['energy_interval_pred_base'] = df['predictive_energy_interval_kWh']
+    # 3. Interval energy is missing in this version, so we compute it from the cumulative columns
+    df['energy_interval_true'] = df['scheduled_energy_cumulative_kWh'].diff().fillna(0).clip(lower=0)
+    df['energy_interval_pred_base'] = df['predictive_energy_cumulative_kWh'].diff().fillna(0).clip(lower=0)
     
     return df
 
@@ -107,7 +108,6 @@ def apply_grid_override(df_day_subset):
     for i in range(len(df_dyn)):
         t_stamp = df_dyn.index[i].time()
         
-        # Determine if currently inside the event window
         if event_start_time <= event_end_time:
             is_grid_event = event_start_time <= t_stamp <= event_end_time
         else:
@@ -124,7 +124,6 @@ def apply_grid_override(df_day_subset):
                 # SHED LOAD: AC is off
                 df_dyn.loc[df_dyn.index[i], 'power_pred'] = 0.0
                 
-                # Temp drifts up toward outdoor temp
                 outdoor_t = df_dyn['outdoor_temperature_C'].iloc[i]
                 if current_temp_with_drift < outdoor_t:
                     temp_drift += (outdoor_t - current_temp_with_drift) * 0.05 
@@ -203,7 +202,7 @@ with col4:
 st.markdown("---")
 
 # --- CHARTS ---
-tab1, tab2 = st.tabs(["🔴 Live Telemetry", "🔍 ML Forecast Accuracy"])
+tab1, tab2 = st.tabs(["🔴 Live Telemetry", "🔍 ML Forecast Accuracy (15m)"])
 
 def create_plot(data, y_true_col, y_pred_col, title, y_label, true_name, pred_name, hlines=[], show_grid=False):
     fig = go.Figure()
@@ -248,19 +247,19 @@ def create_plot(data, y_true_col, y_pred_col, title, y_label, true_name, pred_na
 with tab1:
     col_chart1, col_chart2 = st.columns(2)
     with col_chart1:
-        st.plotly_chart(create_plot(df_live_dyn, 'occ_true', 'occ_pred_30m', "Live Occupancy", "Occupants", "Actual Now", "Forecasted (30m)"), use_container_width=True)
+        st.plotly_chart(create_plot(df_live_dyn, 'occ_true', 'occ_pred_15m', "Live Occupancy", "Occupants", "Actual Now", "Forecasted (15m)"), use_container_width=True)
         st.plotly_chart(create_plot(df_live_dyn, 'power_true', 'power_pred', "HVAC Power Draw (kW)", "Power (kW)", "Scheduled", "Predictive (with Grid Override)", show_grid=True), use_container_width=True)
     with col_chart2:
         st.plotly_chart(create_plot(df_live_dyn, 'T_true', 'T_pred_dynamic', "Live Temp vs Constraints", "Temp (°C)", "Scheduled", "Predictive", hlines=[22.8, 25.8, max_temp_override], show_grid=True), use_container_width=True)
 
 with tab2:
-    st.write("Compare the model's 30-minute forecast against what actually happened 30 minutes later.")
+    st.write("Compare the model's 15-minute forecast against what actually happened 15 minutes later.")
     fig_forecast = go.Figure()
-    if not df_live_dyn.empty and 'occ_actual_30m' in df_live_dyn.columns and 'occ_pred_30m' in df_live_dyn.columns:
-        fig_forecast.add_trace(go.Scatter(x=df_live_dyn.index, y=df_live_dyn['occ_actual_30m'], name="Actual (30m Later)", line=dict(color='purple', width=2)))
-        fig_forecast.add_trace(go.Scatter(x=df_live_dyn.index, y=df_live_dyn['occ_pred_30m'], name="Forecasted 30m", line=dict(color='orange', dash='dash', width=2)))
+    if not df_live_dyn.empty and 'occ_actual_15m' in df_live_dyn.columns and 'occ_pred_15m' in df_live_dyn.columns:
+        fig_forecast.add_trace(go.Scatter(x=df_live_dyn.index, y=df_live_dyn['occ_actual_15m'], name="Actual (15m Later)", line=dict(color='purple', width=2)))
+        fig_forecast.add_trace(go.Scatter(x=df_live_dyn.index, y=df_live_dyn['occ_pred_15m'], name="Forecasted 15m", line=dict(color='orange', dash='dash', width=2)))
     
     full_day_start = datetime.combine(selected_day, datetime.min.time())
     full_day_end = datetime.combine(selected_day, time(23, 59))
-    fig_forecast.update_layout(title="30-Minute Occupancy Forecast Accuracy", xaxis_title="Time", yaxis_title="Occupants", hovermode="x unified", xaxis_range=[full_day_start, full_day_end])
+    fig_forecast.update_layout(title="15-Minute Occupancy Forecast Accuracy", xaxis_title="Time", yaxis_title="Occupants", hovermode="x unified", xaxis_range=[full_day_start, full_day_end])
     st.plotly_chart(fig_forecast, use_container_width=True)
