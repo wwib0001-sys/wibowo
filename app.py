@@ -4,12 +4,11 @@ import plotly.graph_objects as go
 import streamlit.components.v1 as components
 from datetime import datetime, date, time, timezone, timedelta
 
-# Auto-refresh helper (fails gracefully if module is not installed)
+# Auto-refresh helper (only runs when in live mode)
 try:
     from streamlit_autorefresh import st_autorefresh
-    st_autorefresh(interval=30000, key="data_refresh")
 except Exception:
-    pass
+    st_autorefresh = None
 
 # --- 1. PAGE CONFIGURATION & DARK-BLUE STYLING ---
 st.set_page_config(
@@ -35,6 +34,16 @@ st.markdown("""
         padding-top: 1.5rem;
         padding-bottom: 2rem;
         max-width: 96%;
+    }
+    
+    /* Control Toolbar Card */
+    .control-card {
+        background-color: #121e3a;
+        border: 1px solid #1e325c;
+        border-radius: 12px;
+        padding: 12px 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     }
     
     /* Dark-blue Metric Cards */
@@ -171,20 +180,16 @@ def load_data():
     return df
 
 df_full = load_data()
-
-# --- 4. EXTRACT NATIVE DATE & REAL-TIME CLOCK SYNC ---
 available_dates = df_full.index.normalize().unique().date
 
-# Select the target date from CSV (prioritizing Sep 29, otherwise latest CSV date)
-sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
-if sep29_dates:
-    selected_date = sep29_dates[0]
-else:
-    selected_date = available_dates[-1]
+# --- 4. HEADER: TITLE & CLOCK BANNER ---
+col_head_left, col_head_right = st.columns([2.3, 1.1])
 
-df_day = df_full[df_full.index.date == selected_date].copy()
+with col_head_left:
+    st.title("🏢 Smart HVAC Monitoring Dashboard based on Occupancy Prediction")
+    st.markdown("<div class='sub-description'>Real-time facility environmental monitoring, equipment control state, and predictive demand tracking.</div>", unsafe_allow_html=True)
 
-# Live Melbourne current time
+# Live Melbourne current time determination
 try:
     import pytz
     melbourne_tz = pytz.timezone('Australia/Melbourne')
@@ -193,14 +198,82 @@ except Exception:
     melbourne_tz = timezone(timedelta(hours=10))
     now_melbourne = datetime.now(melbourne_tz)
 
-live_time = now_melbourne.time()
+real_live_time = now_melbourne.time()
 
-# Filter data strictly up to the live time using the CSV's native timestamp
-df_live = df_day[df_day.index.time <= live_time]
+# --- 5. CONTROL TOOLBAR: LIVE VS. NON-LIVE HISTORICAL FILTER ---
+st.markdown("<div class='control-card'>", unsafe_allow_html=True)
+col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([1, 1.2, 2])
+
+with col_ctrl1:
+    is_live_mode = st.toggle("🔴 Real-Time Live Mode", value=True, help="Toggle OFF to inspect historical dates and filter system time.")
+
+if is_live_mode:
+    # Trigger auto refresh in live mode
+    if st_autorefresh:
+        st_autorefresh(interval=30000, key="live_refresh")
+
+    # Match Sep 29 if present, or latest available date
+    sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
+    selected_date = sep29_dates[0] if sep29_dates else available_dates[-1]
+    active_time = real_live_time
+    mode_label = "LIVE SYSTEM CLOCK"
+    clock_color = "#ef4444"
+
+    with col_ctrl2:
+        st.write(f"📅 **Tracking Date:** {selected_date.strftime('%Y-%m-%d')}")
+    with col_ctrl3:
+        st.write(f"⏱️ **Tracking Mode:** Dynamic Real-Time Clock Sync ({active_time.strftime('%H:%M:%S')})")
+else:
+    mode_label = "INSPECTION MODE"
+    clock_color = "#38bdf8"
+    
+    with col_ctrl2:
+        selected_date = st.selectbox(
+            "📅 Select Filter Date:", 
+            options=available_dates, 
+            index=len(available_dates)-1
+        )
+    
+    df_day_candidates = df_full[df_full.index.date == selected_date]
+    day_times = df_day_candidates.index.time
+    
+    with col_ctrl3:
+        if len(day_times) > 0:
+            active_time = st.select_slider("⏱️ Scrub Inspection Time:", options=day_times, value=day_times[-1])
+        else:
+            active_time = time(23, 59)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# Render clock banner matching selected mode
+with col_head_right:
+    st.markdown(f"""
+    <div class="clock-card">
+        <div>
+            <div style="font-size: 11px; font-weight: bold; color: {clock_color}; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px;">
+                <span style="height: 8px; width: 8px; background-color: {clock_color}; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px {clock_color};"></span>
+                {mode_label}
+            </div>
+            <div style="font-size: 15px; font-weight: 600; color: #e2e8f0; margin-top: 3px;">
+                {selected_date.strftime('%A, %b %d, %Y')}
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 11px; color: #94a3b8; font-weight: 600;">MELBOURNE TIME</div>
+            <div style="font-size: 26px; font-weight: bold; color: #38bdf8; line-height: 1.1;">
+                {active_time.strftime('%H:%M:%S')}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- 6. DATA FILTERING & METRIC VALUES ---
+df_day = df_full[df_full.index.date == selected_date].copy()
+df_live = df_day[df_day.index.time <= active_time]
+
 if df_live.empty:
     df_live = df_day.iloc[:1]
 
-# --- 5. CURRENT METRIC VALUES ---
 current_temp = df_live['T_pred'].iloc[-1]
 current_power = df_live['power_pred'].iloc[-1]
 current_occ = int(df_live['occ_true'].iloc[-1])
@@ -211,36 +284,6 @@ if current_power > 0:
     hvac_status_html = "<span class='status-badge' style='color: #4ade80;'><span class='circle-indicator circle-on'></span> RUNNING</span>"
 else:
     hvac_status_html = "<span class='status-badge' style='color: #94a3b8;'><span class='circle-indicator circle-off'></span> STANDBY</span>"
-
-# --- 6. HEADER (NATIVE CSV DATE & LIVE CLOCK) ---
-col_head_left, col_head_right = st.columns([2.3, 1.1])
-
-with col_head_left:
-    st.title("🏢 Smart HVAC Monitoring Dashboard based on Occupancy Prediction")
-    st.markdown("<div class='sub-description'>Real-time facility environmental monitoring, equipment control state, and predictive demand tracking.</div>", unsafe_allow_html=True)
-
-with col_head_right:
-    st.markdown(f"""
-    <div class="clock-card">
-        <div>
-            <div style="font-size: 11px; font-weight: bold; color: #f87171; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px;">
-                <span style="height: 8px; width: 8px; background-color: #ef4444; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #ef4444;"></span>
-                LIVE SYSTEM CLOCK
-            </div>
-            <div style="font-size: 15px; font-weight: 600; color: #e2e8f0; margin-top: 3px;">
-                {selected_date.strftime('%A, %b %d, %Y')}
-            </div>
-        </div>
-        <div style="text-align: right;">
-            <div style="font-size: 11px; color: #94a3b8; font-weight: 600;">MELBOURNE TIME</div>
-            <div style="font-size: 26px; font-weight: bold; color: #38bdf8; line-height: 1.1;">
-                {live_time.strftime('%H:%M:%S')}
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
 
 # --- 7. TOP KPI CARDS ---
 col1, col2, col3, col4 = st.columns(4)
@@ -280,7 +323,7 @@ with col4:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 8. CHARTS BOUNDED TO NATIVE CSV TIMESTAMPS ---
+# --- 8. CHARTS BOUNDED TO SELECTED DATE TIMESTAMPS ---
 def create_dark_blue_plot(data, y_col, title, y_label, line_color, is_area=False, is_step=False, hlines=None):
     fig = go.Figure()
     
@@ -318,16 +361,19 @@ def create_dark_blue_plot(data, y_col, title, y_label, line_color, is_area=False
         for hline in hlines:
             fig.add_hline(y=hline, line_dash="dash", line_color="#ef4444", opacity=0.7)
 
-    # Red vertical marker tracking current live time aligned to CSV date
-    live_marker_dt = datetime.combine(selected_date, live_time)
+    # Vertical indicator showing active inspection or live time
+    marker_dt = datetime.combine(selected_date, active_time)
+    marker_text = "LIVE" if is_live_mode else "INSPECT"
+    marker_color = "#ef4444" if is_live_mode else "#38bdf8"
+
     fig.add_vline(
-        x=live_marker_dt, 
+        x=marker_dt, 
         line_width=2, 
         line_dash="solid", 
-        line_color="#ef4444", 
-        annotation_text="LIVE", 
+        line_color=marker_color, 
+        annotation_text=marker_text, 
         annotation_position="top right",
-        annotation_font_color="#ef4444"
+        annotation_font_color=marker_color
     )
 
     fig.update_layout(
