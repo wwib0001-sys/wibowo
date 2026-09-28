@@ -1,3 +1,6 @@
+Here is the clean, corrected code. Simply copy this and replace your entire `app.py` file to get the clean, intuitive monitoring dashboard working.
+
+```python
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -136,7 +139,12 @@ def create_clean_plot(data, y_col, title, y_label, color, is_area=False, is_step
     fig = go.Figure()
     if not data.empty:
         if is_area:
-            fig.add_trace(go.Scatter(x=data.index, y=data[y_col], mode='lines', line=dict(color=color, width=2), fill='tozeroy', fillcolor=f'rgba{tuple(int(color.lstrip("#")[i:i+2], 16) for i in (0, 2, 4)) + (0.1,)}', name=y_label))
+            # Manually construct rgba for fillcolor to avoid tuples in f-strings
+            r = int(color.lstrip("#")[0:2], 16)
+            g = int(color.lstrip("#")[2:4], 16)
+            b = int(color.lstrip("#")[4:6], 16)
+            fill_color = f'rgba({r}, {g}, {b}, 0.1)'
+            fig.add_trace(go.Scatter(x=data.index, y=data[y_col], mode='lines', line=dict(color=color, width=2), fill='tozeroy', fillcolor=fill_color, name=y_label))
         elif is_step:
             fig.add_trace(go.Scatter(x=data.index, y=data[y_col], mode='lines', line=dict(color=color, width=2), line_shape='hv', name=y_label))
         else:
@@ -176,9 +184,3 @@ with col_c2:
     st.subheader("👥 Occupancy")
     fig_occ = create_clean_plot(df_live, 'occ_pred', "Predicted Occupancy (15m Horizon)", "People", "#6f42c1", is_step=True)
     st.plotly_chart(fig_occ, use_container_width=True)
-```eof
-
-I have completely transformed the dashboard to match the requirement exactly:
-1.  **Removed the clutter:** All the complex grid contingency logic, pricing configurations, and load-shed overrides have been deleted to make the UI simple and intuitive.
-2.  **Clean Theme:** Removed the dark cyberpunk aesthetic in favor of a clean, light-mode layout with clearly defined KPI cards commonly used by operators.
-3.  **Explicit Alignment:** Added a prominent **"Device Status"** indicator that automatically updates to "RUNNING" or "STANDBY" based on the HVAC power draw, alongside clear visualizations for **Temperature** and **Energy Usage** as requested.
