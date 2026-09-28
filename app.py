@@ -18,7 +18,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Dark-Blue Theme Custom CSS
 st.markdown("""
 <style>
     /* Dark-blue application background */
@@ -27,7 +26,7 @@ st.markdown("""
         color: #f1f5f9 !important;
     }
     
-    /* Completely hide the sidebar */
+    /* Completely hide sidebar */
     [data-testid="stSidebar"], section[data-testid="stSidebar"] {
         display: none !important;
     }
@@ -103,7 +102,6 @@ st.markdown("""
         background: radial-gradient(circle at 30% 30%, #94a3b8, #475569); 
     }
     
-    /* Headers & Text color overrides */
     h1, h2, h3, h4, p {
         color: #ffffff !important;
     }
@@ -120,8 +118,8 @@ st.markdown("""
 components.html("""
 <script>
     const parentWin = window.parent;
-    let scrollSpeed = 1;      // Pixels per step (adjust speed here)
-    let intervalTime = 30;    // Milliseconds per step
+    let scrollSpeed = 1;
+    let intervalTime = 30;
     let isPaused = false;
 
     function autoScroll() {
@@ -129,27 +127,24 @@ components.html("""
             let maxScroll = parentWin.document.documentElement.scrollHeight - parentWin.innerHeight;
             let currentScroll = parentWin.scrollY || parentWin.pageYOffset;
 
-            // When reaching or nearing bottom, pause and smoothly reset to top
             if (currentScroll >= maxScroll - 2) {
                 isPaused = true;
                 setTimeout(() => {
                     parentWin.scrollTo({ top: 0, behavior: 'smooth' });
                     setTimeout(() => {
                         isPaused = false;
-                    }, 2500); // 2.5s pause at the top before starting next loop
-                }, 2000);     // 2.0s pause at the bottom
+                    }, 2500);
+                }, 2000);
             } else {
                 parentWin.scrollBy(0, scrollSpeed);
             }
         }
     }
-
-    // Initialize auto scroll interval
     setInterval(autoScroll, intervalTime);
 </script>
 """, height=0, width=0)
 
-# --- 3. DATA LOADING & 29 SEPTEMBER 2026 MAPPING ---
+# --- 3. DATA LOADING DIRECTLY FROM HVAC CSV ---
 @st.cache_data(ttl=60)
 def load_data():
     try:
@@ -177,22 +172,19 @@ def load_data():
 
 df_full = load_data()
 
-# Target date set to 29 September 2026
-target_date = date(2026, 9, 29)
+# --- 4. EXTRACT NATIVE DATE & REAL-TIME CLOCK SYNC ---
+available_dates = df_full.index.normalize().unique().date
 
-# Filter dataset for September 29 and map timestamp year to 2026
-df_sep29 = df_full[(df_full.index.month == 9) & (df_full.index.day == 29)].copy()
-
-if not df_sep29.empty:
-    df_day = df_sep29
-    df_day.index = df_day.index.map(lambda dt: dt.replace(year=2026))
+# Select the target date from CSV (prioritizing Sep 29, otherwise latest CSV date)
+sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
+if sep29_dates:
+    selected_date = sep29_dates[0]
 else:
-    # Fallback to first available date
-    first_date = df_full.index.date[0]
-    df_day = df_full[df_full.index.date == first_date].copy()
-    df_day.index = df_day.index.map(lambda dt: dt.replace(year=2026, month=9, day=29))
+    selected_date = available_dates[-1]
 
-# --- 4. LIVE MELBOURNE TIME TRACKING ---
+df_day = df_full[df_full.index.date == selected_date].copy()
+
+# Live Melbourne current time
 try:
     import pytz
     melbourne_tz = pytz.timezone('Australia/Melbourne')
@@ -203,7 +195,7 @@ except Exception:
 
 live_time = now_melbourne.time()
 
-# Filter data dynamically up to current Melbourne live time
+# Filter data strictly up to the live time using the CSV's native timestamp
 df_live = df_day[df_day.index.time <= live_time]
 if df_live.empty:
     df_live = df_day.iloc[:1]
@@ -220,7 +212,7 @@ if current_power > 0:
 else:
     hvac_status_html = "<span class='status-badge' style='color: #94a3b8;'><span class='circle-indicator circle-off'></span> STANDBY</span>"
 
-# --- 6. HEADER (TITLE WITH OCCUPANCY PREDICTION + CLOCK BANNER) ---
+# --- 6. HEADER (NATIVE CSV DATE & LIVE CLOCK) ---
 col_head_left, col_head_right = st.columns([2.3, 1.1])
 
 with col_head_left:
@@ -236,7 +228,7 @@ with col_head_right:
                 LIVE SYSTEM CLOCK
             </div>
             <div style="font-size: 15px; font-weight: 600; color: #e2e8f0; margin-top: 3px;">
-                {target_date.strftime('%A, %b %d, %Y')}
+                {selected_date.strftime('%A, %b %d, %Y')}
             </div>
         </div>
         <div style="text-align: right;">
@@ -288,7 +280,7 @@ with col4:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 8. CHARTS WITH DARK BLUE THEME ---
+# --- 8. CHARTS BOUNDED TO NATIVE CSV TIMESTAMPS ---
 def create_dark_blue_plot(data, y_col, title, y_label, line_color, is_area=False, is_step=False, hlines=None):
     fig = go.Figure()
     
@@ -326,8 +318,8 @@ def create_dark_blue_plot(data, y_col, title, y_label, line_color, is_area=False
         for hline in hlines:
             fig.add_hline(y=hline, line_dash="dash", line_color="#ef4444", opacity=0.7)
 
-    # Red vertical marker tracking current Melbourne live time
-    live_marker_dt = datetime.combine(target_date, live_time)
+    # Red vertical marker tracking current live time aligned to CSV date
+    live_marker_dt = datetime.combine(selected_date, live_time)
     fig.add_vline(
         x=live_marker_dt, 
         line_width=2, 
@@ -351,7 +343,7 @@ def create_dark_blue_plot(data, y_col, title, y_label, line_color, is_area=False
             showgrid=True, 
             gridcolor="#1e325c", 
             zeroline=False,
-            range=[datetime.combine(target_date, time.min), datetime.combine(target_date, time.max)]
+            range=[datetime.combine(selected_date, time.min), datetime.combine(selected_date, time.max)]
         ),
         yaxis=dict(showgrid=True, gridcolor="#1e325c", zeroline=False),
         legend=dict(font=dict(color="#f1f5f9"))
