@@ -208,4 +208,4 @@ with col_c2:
         fig_occ.add_trace(go.Scatter(x=df_live.index, y=df_live['occ_true'], mode='lines', line=dict(color="#6c757d", width=2, dash="dot"), line_shape='hv', name="Actual Now"))
     
     st.plotly_chart(fig_occ, use_container_width=True)
-```eof
+
