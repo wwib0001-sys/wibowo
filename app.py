@@ -1,6 +1,3 @@
-Here is the clean, corrected code. Simply copy this and replace your entire `app.py` file to get the clean, intuitive monitoring dashboard working.
-
-```python
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
