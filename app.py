@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
 from datetime import datetime, date, time, timezone, timedelta
 
-# Auto-refresh helper (only runs when in live mode)
+# Auto-refresh helper (only triggers in live mode)
 try:
     from streamlit_autorefresh import st_autorefresh
 except Exception:
@@ -51,7 +52,7 @@ st.markdown("""
         background-color: #121e3a;
         border: 1px solid #1e325c;
         border-radius: 12px;
-        padding: 20px;
+        padding: 18px;
         text-align: center;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
         height: 100%;
@@ -61,22 +62,22 @@ st.markdown("""
     }
     .metric-title { 
         color: #94a3b8; 
-        font-size: 13px; 
+        font-size: 12px; 
         font-weight: 700; 
         text-transform: uppercase; 
         letter-spacing: 0.8px;
-        margin-bottom: 8px; 
+        margin-bottom: 6px; 
     }
     .metric-value { 
         color: #ffffff; 
-        font-size: 32px; 
+        font-size: 30px; 
         font-weight: bold; 
     }
     .metric-subtext { 
         color: #38bdf8; 
-        font-size: 15px; 
+        font-size: 14px; 
         font-weight: 600; 
-        margin-top: 6px; 
+        margin-top: 4px; 
     }
     
     /* Header Clock Banner Card */
@@ -95,11 +96,11 @@ st.markdown("""
         align-items: center;
         gap: 8px;
         font-weight: 700;
-        font-size: 26px;
+        font-size: 24px;
     }
     .circle-indicator { 
-        width: 20px; 
-        height: 20px; 
+        width: 18px; 
+        height: 18px; 
         border-radius: 50%; 
         display: inline-block;
     }
@@ -171,6 +172,7 @@ def load_data():
     # Map standard columns
     df['occ_true'] = df['occupancy_now']
     df['occ_pred'] = df['occupancy_forecast_15min']
+    df['occ_actual_15m'] = df['occupancy_actual_15min_later']
     df['T_pred'] = df['predictive_room_temperature_C']
     df['power_pred'] = df['predictive_hvac_power_kW']
     
@@ -189,7 +191,7 @@ with col_head_left:
     st.title("🏢 Smart HVAC Monitoring Dashboard based on Occupancy Prediction")
     st.markdown("<div class='sub-description'>Real-time facility environmental monitoring, equipment control state, and predictive demand tracking.</div>", unsafe_allow_html=True)
 
-# Live Melbourne current time determination
+# Live Melbourne current time
 try:
     import pytz
     melbourne_tz = pytz.timezone('Australia/Melbourne')
@@ -200,7 +202,7 @@ except Exception:
 
 real_live_time = now_melbourne.time()
 
-# --- 5. CONTROL TOOLBAR: LIVE VS. NON-LIVE HISTORICAL FILTER ---
+# --- 5. CONTROL TOOLBAR: LIVE VS. HISTORICAL FILTER ---
 st.markdown("<div class='control-card'>", unsafe_allow_html=True)
 col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([1, 1.2, 2])
 
@@ -208,11 +210,9 @@ with col_ctrl1:
     is_live_mode = st.toggle("🔴 Real-Time Live Mode", value=True, help="Toggle OFF to inspect historical dates and filter system time.")
 
 if is_live_mode:
-    # Trigger auto refresh in live mode
     if st_autorefresh:
         st_autorefresh(interval=30000, key="live_refresh")
 
-    # Match Sep 29 if present, or latest available date
     sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
     selected_date = sep29_dates[0] if sep29_dates else available_dates[-1]
     active_time = real_live_time
@@ -267,7 +267,7 @@ with col_head_right:
     </div>
     """, unsafe_allow_html=True)
 
-# --- 6. DATA FILTERING & METRIC VALUES ---
+# --- 6. DATA FILTERING & CORE METRIC VALUES ---
 df_day = df_full[df_full.index.date == selected_date].copy()
 df_live = df_day[df_day.index.time <= active_time]
 
@@ -280,18 +280,29 @@ current_occ = int(df_live['occ_true'].iloc[-1])
 forecast_occ = int(df_live['occ_pred'].iloc[-1])
 total_energy_today = df_live['energy_interval_pred'].sum()
 
+# Compute Realisation Statistics (Day-to-Date)
+eval_subset = df_live.dropna(subset=['occ_pred', 'occ_actual_15m'])
+if len(eval_subset) > 0:
+    mae_val = np.mean(np.abs(eval_subset['occ_actual_15m'] - eval_subset['occ_pred']))
+    rmse_val = np.sqrt(np.mean((eval_subset['occ_actual_15m'] - eval_subset['occ_pred'])**2))
+    bin_actual = (eval_subset['occ_actual_15m'] > 0).astype(int)
+    bin_pred = (eval_subset['occ_pred'] > 0).astype(int)
+    bin_acc = np.mean(bin_actual == bin_pred) * 100
+else:
+    mae_val, rmse_val, bin_acc = 0.0, 0.0, 100.0
+
 if current_power > 0:
     hvac_status_html = "<span class='status-badge' style='color: #4ade80;'><span class='circle-indicator circle-on'></span> RUNNING</span>"
 else:
     hvac_status_html = "<span class='status-badge' style='color: #94a3b8;'><span class='circle-indicator circle-off'></span> STANDBY</span>"
 
 # --- 7. TOP KPI CARDS ---
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns([1.1, 1, 1, 1.2, 1.2])
 
 with col1:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">Device Status (HVAC)</div>
+        <div class="metric-title">Device Status</div>
         <div class="metric-value">{hvac_status_html}</div>
     </div>
     """, unsafe_allow_html=True)
@@ -299,7 +310,7 @@ with col1:
 with col2:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">Indoor Temperature</div>
+        <div class="metric-title">Indoor Temp</div>
         <div class="metric-value">{current_temp:.1f} °C</div>
     </div>
     """, unsafe_allow_html=True)
@@ -307,7 +318,7 @@ with col2:
 with col3:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-title">Total Energy Today</div>
+        <div class="metric-title">Total Energy</div>
         <div class="metric-value">{total_energy_today:.1f} kWh</div>
     </div>
     """, unsafe_allow_html=True)
@@ -316,18 +327,27 @@ with col4:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-title">Occupancy Demand</div>
-        <div class="metric-value">{current_occ} <span style="font-size: 16px; font-weight: normal; color: #94a3b8;">Now</span></div>
+        <div class="metric-value">{current_occ} <span style="font-size: 15px; font-weight: normal; color: #94a3b8;">Now</span></div>
         <div class="metric-subtext">📈 Forecast (15m): {forecast_occ}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col5:
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="metric-title">Prediction Realisation</div>
+        <div class="metric-value">{bin_acc:.1f}% <span style="font-size: 14px; font-weight: normal; color: #94a3b8;">State Acc</span></div>
+        <div class="metric-subtext">MAE: {mae_val:.2f} | RMSE: {rmse_val:.2f}</div>
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 8. CHARTS BOUNDED TO SELECTED DATE TIMESTAMPS ---
+# --- 8. REUSABLE PLOT HELPER ---
 def create_dark_blue_plot(data, y_col, title, y_label, line_color, is_area=False, is_step=False, hlines=None):
     fig = go.Figure()
     
-    if not data.empty:
+    if not data.empty and y_col in data.columns:
         if is_area:
             r = int(line_color.lstrip("#")[0:2], 16)
             g = int(line_color.lstrip("#")[2:4], 16)
@@ -361,7 +381,6 @@ def create_dark_blue_plot(data, y_col, title, y_label, line_color, is_area=False
         for hline in hlines:
             fig.add_hline(y=hline, line_dash="dash", line_color="#ef4444", opacity=0.7)
 
-    # Vertical indicator showing active inspection or live time
     marker_dt = datetime.combine(selected_date, active_time)
     marker_text = "LIVE" if is_live_mode else "INSPECT"
     marker_color = "#ef4444" if is_live_mode else "#38bdf8"
@@ -396,7 +415,8 @@ def create_dark_blue_plot(data, y_col, title, y_label, line_color, is_area=False
     )
     return fig
 
-# Temperature Chart
+# --- 9. CHARTS ---
+# Row 1: Temperature Profile
 st.subheader("🌡️ Temperature Profile")
 fig_temp = create_dark_blue_plot(df_live, 'T_pred', "Indoor Temperature Tracking", "Temperature (°C)", "#38bdf8", hlines=[22.8, 25.8])
 fig_temp.add_hrect(
@@ -410,24 +430,67 @@ fig_temp.add_hrect(
 )
 st.plotly_chart(fig_temp, use_container_width=True)
 
-# Energy and Occupancy Charts
+# Row 2: Occupancy Realisation vs. Power Draw
 col_c1, col_c2 = st.columns(2)
 
 with col_c1:
-    st.subheader("⚡ Energy Usage")
-    fig_energy = create_dark_blue_plot(df_live, 'power_pred', "HVAC Power Draw (Demand)", "Power (kW)", "#fb923c", is_area=True)
-    st.plotly_chart(fig_energy, use_container_width=True)
-
-with col_c2:
-    st.subheader("👥 Occupancy Demand")
-    fig_occ = create_dark_blue_plot(df_live, 'occ_pred', "Predicted Occupancy (15m Horizon)", "People", "#a855f7", is_step=True)
+    st.subheader("👥 Occupancy Realisation (15m Ahead)")
+    fig_realisation = go.Figure()
+    
     if not df_live.empty:
-        fig_occ.add_trace(go.Scatter(
+        # Ground Truth Realised (15 min later)
+        if 'occ_actual_15m' in df_live.columns:
+            fig_realisation.add_trace(go.Scatter(
+                x=df_live.index, 
+                y=df_live['occ_actual_15m'], 
+                mode='lines', 
+                name='Actual Realised (15m Later)',
+                line=dict(color='#4ade80', width=2.5),
+                line_shape='hv'
+            ))
+        
+        # Model 15-minute prediction
+        fig_realisation.add_trace(go.Scatter(
+            x=df_live.index, 
+            y=df_live['occ_pred'], 
+            mode='lines', 
+            name='Model Forecast (15m Ahead)',
+            line=dict(color='#38bdf8', width=2, dash='dot'),
+            line_shape='hv'
+        ))
+        
+        # Current occupancy now
+        fig_realisation.add_trace(go.Scatter(
             x=df_live.index, 
             y=df_live['occ_true'], 
             mode='lines', 
-            line=dict(color="#94a3b8", width=2, dash="dot"), 
-            line_shape='hv', 
-            name="Actual Now"
+            name='Occupancy (Now)',
+            line=dict(color='#94a3b8', width=1.5, dash='dash'),
+            line_shape='hv'
         ))
-    st.plotly_chart(fig_occ, use_container_width=True)
+
+    marker_dt = datetime.combine(selected_date, active_time)
+    marker_text = "LIVE" if is_live_mode else "INSPECT"
+    marker_color = "#ef4444" if is_live_mode else "#38bdf8"
+    fig_realisation.add_vline(x=marker_dt, line_width=2, line_dash="solid", line_color=marker_color)
+
+    fig_realisation.update_layout(
+        title=dict(text="Forecast vs. Ground Truth Realisation", font=dict(size=16, color="#f1f5f9")),
+        xaxis_title="", yaxis_title="Occupants",
+        hovermode="x unified",
+        margin=dict(l=20, r=20, t=40, b=20),
+        plot_bgcolor="#121e3a", paper_bgcolor="#121e3a",
+        font=dict(color="#94a3b8"),
+        xaxis=dict(
+            showgrid=True, gridcolor="#1e325c", zeroline=False,
+            range=[datetime.combine(selected_date, time.min), datetime.combine(selected_date, time.max)]
+        ),
+        yaxis=dict(showgrid=True, gridcolor="#1e325c", zeroline=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="#f1f5f9"))
+    )
+    st.plotly_chart(fig_realisation, use_container_width=True)
+
+with col_c2:
+    st.subheader("⚡ Energy Usage (HVAC Demand)")
+    fig_energy = create_dark_blue_plot(df_live, 'power_pred', "HVAC Power Draw (Demand)", "Power (kW)", "#fb923c", is_area=True)
+    st.plotly_chart(fig_energy, use_container_width=True)
