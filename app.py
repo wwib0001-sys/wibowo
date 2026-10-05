@@ -344,7 +344,7 @@ cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
 is_cooling = cur_power > 0.05
 hvac_on = cur_power > 0.0
 
-# --- 6. TOP 4 KPI CARDS (ENLARGED & ACCENTUATED) ---
+# --- 6. TOP 4 KPI CARDS ---
 kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1.1, 1.3, 1.1, 1.5])
 
 # Box 1: Occupancy
@@ -441,7 +441,7 @@ st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
 t_start = datetime.combine(selected_date, time(8, 0))
 t_end = datetime.combine(selected_date, time(18, 0))
 
-# --- 7. MID-ROW: ENERGY CONSUMPTION & TEMPERATURE TREND (08:00 - 18:00) ---
+# --- 7. MID-ROW: ENERGY CONSUMPTION & TEMPERATURE TREND ---
 chart_col1, chart_col2 = st.columns(2)
 
 with chart_col1:
@@ -478,39 +478,66 @@ with chart_col2:
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend</div>", unsafe_allow_html=True)
     fig_temp = go.Figure()
     
+    # Comfort Band Shading (22.8 - 25.8°C)
     fig_temp.add_hrect(
-        y0=22.8, y1=25.8, line_width=0, fillcolor="#22c55e", opacity=0.15,
+        y0=22.8, y1=25.8, line_width=0, fillcolor="#22c55e", opacity=0.18,
         annotation_text="Comfort Range (22.8 - 25.8°C)", annotation_position="top right", annotation_font_size=13
     )
-    fig_temp.add_trace(go.Scatter(
-        x=df_live.index, y=df_live['outdoor_temperature_C'],
-        mode='lines', name='Outdoor Temperature',
-        line=dict(color='#f97316', width=3.5)
-    ))
-    fig_temp.add_hline(y=24.0, line_dash="dash", line_color="#10b981", line_width=2.5, annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=13)
+    
+    # Setpoint line at 24.0°C
+    fig_temp.add_hline(
+        y=24.0, line_dash="dash", line_color="#10b981", line_width=2.5, 
+        annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=13
+    )
+    
+    # Zone Temperature (Primary focus line, high visibility)
     fig_temp.add_trace(go.Scatter(
         x=df_live.index, y=df_live['predictive_room_temperature_C'],
         mode='lines', name='Zone Temperature',
         line=dict(color='#0284c7', width=4)
     ))
     
+    # Outdoor Temperature placed on secondary y-axis to prevent compressing zone temperature
+    fig_temp.add_trace(go.Scatter(
+        x=df_live.index, y=df_live['outdoor_temperature_C'],
+        mode='lines', name='Outdoor Temp (Ref)',
+        line=dict(color='#f97316', width=2.5, dash='dot'),
+        yaxis='y2'
+    ))
+    
     fig_temp.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
 
+    # Ultra-compact 3°C scale: 23.5°C to 26.5°C with 0.5°C steps
     fig_temp.update_layout(
         height=400,
         margin=dict(l=25, r=25, t=10, b=25),
-        xaxis_title="", yaxis_title="Temperature (°C)",
+        xaxis_title="", 
         plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
         font=dict(color="#334155", size=15),
         xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[t_start, t_end]),
-        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[16, 32]),
+        yaxis=dict(
+            title="Zone Temperature (°C)",
+            showgrid=True, 
+            gridcolor="#f1f5f9", 
+            tickfont=dict(size=14), 
+            range=[23.5, 26.5],  # Tight 3-degree view
+            dtick=0.5            # 0.5°C increments
+        ),
+        yaxis2=dict(
+            title="Outdoor (°C)",
+            overlaying='y',
+            side='right',
+            showgrid=False,
+            tickfont=dict(size=12, color='#f97316'),
+            range=[15.0, 35.0]
+        ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
     st.plotly_chart(fig_temp, use_container_width=True)
 
 st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
 
-# --- 8. BOTTOM ROW: DEVICE STATUS & OCCUPANCY (SCALE ADJUSTED TO 0-8) ---
+# --- 8. BOTTOM ROW: DEVICE STATUS & OCCUPANCY (SCALE 0-8) ---
 bot_col1, bot_col2 = st.columns([1.1, 1.9])
 
 with bot_col1:
@@ -549,7 +576,6 @@ with bot_col2:
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>👥 Occupancy Tracking & Prediction</div>", unsafe_allow_html=True)
     fig_occ = go.Figure()
     
-    # Dynamic tight Y-axis range calculation (capped comfortably at 8 or actual max + 2)
     day_window_data = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
     max_occ_day = max(day_window_data['occupancy_now'].max(), day_window_data['occupancy_forecast_15min'].max())
     y_upper = max(8, int(max_occ_day) + 2) if pd.notna(max_occ_day) else 8
@@ -581,8 +607,8 @@ with bot_col2:
             showgrid=True, 
             gridcolor="#f1f5f9", 
             tickfont=dict(size=14), 
-            range=[0, y_upper],  # Dynamic tight scale (0 to 8) instead of 0 to 50
-            dtick=1              # Step increments of 1 person for distinct visibility
+            range=[0, y_upper],
+            dtick=1
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
