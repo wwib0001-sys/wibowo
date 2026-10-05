@@ -5,10 +5,10 @@ import plotly.graph_objects as go
 import streamlit.components.v1 as components
 from datetime import datetime, date, time, timezone, timedelta
 
-# Auto-refresh helper to continuously move data
+# Auto-refresh interval (5 minutes) so it doesn't interrupt smooth scrolling
 try:
     from streamlit_autorefresh import st_autorefresh
-    st_autorefresh(interval=30000, key="data_loop_refresh")
+    st_autorefresh(interval=300000, key="data_loop_refresh")
 except Exception:
     pass
 
@@ -32,9 +32,10 @@ st.markdown("""
         display: none !important;
     }
     
+    /* Ensure content has sufficient vertical height for auto-scroll loop */
     .main .block-container {
-        padding-top: 1rem;
-        padding-bottom: 2rem;
+        padding-top: 1.5rem;
+        padding-bottom: 8rem; /* Extra space at the bottom for smooth looping */
         max-width: 98%;
     }
     
@@ -43,8 +44,8 @@ st.markdown("""
         background-color: #ffffff;
         border: 1.5px solid #cbd5e1;
         border-radius: 14px;
-        padding: 10px 18px;
-        margin-bottom: 16px;
+        padding: 12px 20px;
+        margin-bottom: 22px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     }
     
@@ -53,27 +54,22 @@ st.markdown("""
         background-color: #ffffff;
         border: 1.5px solid #cbd5e1;
         border-radius: 16px;
-        padding: 20px 24px;
+        padding: 24px 26px;
         box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
         height: 100%;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    .dashboard-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
     }
     
     .card-header-title {
-        font-size: 19px;
+        font-size: 20px;
         font-weight: 800;
         color: #1e293b;
         display: flex;
         align-items: center;
         gap: 10px;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
     }
     
     /* Pulsing Green Comfort Hero Badge */
@@ -81,7 +77,7 @@ st.markdown("""
         background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
         color: #ffffff;
         border-radius: 16px;
-        padding: 22px 20px;
+        padding: 26px 20px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -95,7 +91,7 @@ st.markdown("""
         50% { box-shadow: 0 0 28px rgba(22, 163, 74, 0.6); }
     }
     .comfort-text {
-        font-size: 32px;
+        font-size: 34px;
         font-weight: 900;
         letter-spacing: 1px;
     }
@@ -104,17 +100,17 @@ st.markdown("""
     .status-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 17px;
+        font-size: 18px;
     }
     .status-table th {
         background-color: #e2e8f0;
         color: #334155;
         font-weight: 800;
-        padding: 12px 18px;
+        padding: 14px 20px;
         text-align: left;
     }
     .status-table td {
-        padding: 11px 18px;
+        padding: 13px 20px;
         border-bottom: 1px solid #f1f5f9;
         color: #0f172a;
         font-weight: 600;
@@ -142,39 +138,62 @@ st.markdown("""
     }
     @keyframes blinkLive {
         0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.6; transform: scale(1.15); }
+        50% { opacity: 0.5; transform: scale(1.15); }
     }
-    .circle-green { background-color: #16a34a; box-shadow: 0 0 8px rgba(22, 163, 74, 0.8); }
+    .circle-green { background-color: #16a34a; box-shadow: 0 0 10px rgba(22, 163, 74, 0.8); }
     .circle-gray { background-color: #94a3b8; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. AUTOMATIC SMOOTH SCREEN SCROLL LOOP (FOR CONTINUOUS TV DISPLAY) ---
+# --- 2. AUTOMATIC SMOOTH TV SCROLL LOOP (TARGETS STREAMLIT ROOT CONTAINER) ---
 components.html("""
 <script>
-    const parentWin = window.parent;
-    let scrollSpeed = 1;      // Speed: 1px per step
-    let intervalTime = 30;    // Step interval in ms
-    let isPaused = false;
+    function startTVScroll() {
+        const parentDoc = window.parent.document;
+        // In Streamlit, this container handles 100% of vertical scrolling:
+        const scrollContainer = parentDoc.querySelector('[data-testid="stAppViewContainer"]') || 
+                                parentDoc.querySelector('.main') || 
+                                parentDoc.documentElement;
 
-    function autoScroll() {
-        if (!isPaused && parentWin) {
-            let maxScroll = parentWin.document.documentElement.scrollHeight - parentWin.innerHeight;
-            let currentScroll = parentWin.scrollY || parentWin.pageYOffset;
+        if (!scrollContainer) {
+            setTimeout(startTVScroll, 500);
+            return;
+        }
 
-            // When approaching the bottom, pause briefly and smoothly return to top
-            if (currentScroll >= maxScroll - 3) {
+        let scrollSpeed = 1;      // 1 pixel per tick for clean, smooth motion
+        let intervalMs = 30;      // 30ms tick rate
+        let isPaused = false;
+
+        setInterval(() => {
+            if (isPaused) return;
+
+            const maxScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
+            
+            // If the screen is taller than the content, we gently expand the spacer
+            if (maxScroll <= 10) return;
+
+            if (scrollContainer.scrollTop >= maxScroll - 4) {
+                // Reached bottom: Pause for 3 seconds, smoothly glide to top
                 isPaused = true;
                 setTimeout(() => {
-                    parentWin.scrollTo({ top: 0, behavior: 'smooth' });
-                    setTimeout(() => { isPaused = false; }, 3000); // 3-second pause at the top
-                }, 2500); // 2.5-second pause at the bottom
+                    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                    // Pause for 3.5 seconds at the top before starting next loop
+                    setTimeout(() => {
+                        isPaused = false;
+                    }, 3500);
+                }, 3000);
             } else {
-                parentWin.scrollBy(0, scrollSpeed);
+                scrollContainer.scrollTop += scrollSpeed;
             }
-        }
+        }, intervalMs);
     }
-    setInterval(autoScroll, intervalTime);
+
+    // Run when DOM is ready
+    if (window.parent.document.readyState === 'complete') {
+        startTVScroll();
+    } else {
+        window.parent.addEventListener('load', startTVScroll);
+    }
 </script>
 """, height=0, width=0)
 
@@ -197,7 +216,6 @@ def load_data():
 df_full = load_data()
 available_dates = df_full.index.normalize().unique().date
 
-# Default to Sep 29 or latest available date
 sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
 default_date = sep29_dates[0] if sep29_dates else available_dates[-1]
 
@@ -218,8 +236,8 @@ col_head_left, col_head_mid, col_head_right = st.columns([2.5, 1.3, 1.0])
 with col_head_left:
     st.markdown("""
         <div style="line-height: 1.2;">
-            <div style="font-size: 34px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px;">Innovation Lab – HVAC Monitoring</div>
-            <div style="font-size: 18px; font-weight: 600; color: #64748b; margin-top: 3px;">Occupancy Prediction Based Control</div>
+            <div style="font-size: 36px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px;">Innovation Lab – HVAC Monitoring</div>
+            <div style="font-size: 19px; font-weight: 600; color: #64748b; margin-top: 3px;">Occupancy Prediction Based Control</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -227,13 +245,13 @@ with col_head_mid:
     st.markdown(f"""
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 24px; margin-top: 6px;">
             <div style="text-align: right; line-height: 1.2;">
-                <div style="font-size: 14px; color: #64748b; font-weight: 700;">📅 {default_date.strftime('%a, %d %b %Y')}</div>
-                <div style="font-size: 24px; font-weight: 900; color: #0f172a;">{real_live_time.strftime('%H:%M:%S')}</div>
+                <div style="font-size: 15px; color: #64748b; font-weight: 700;">📅 {default_date.strftime('%a, %d %b %Y')}</div>
+                <div style="font-size: 26px; font-weight: 900; color: #0f172a;">{real_live_time.strftime('%H:%M:%S')}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span class="circle-dot circle-green"></span>
                 <div style="line-height: 1.1;">
-                    <div style="font-size: 16px; font-weight: 800; color: #0f172a;">System Online</div>
+                    <div style="font-size: 17px; font-weight: 800; color: #0f172a;">System Online</div>
                     <div style="font-size: 12px; color: #64748b; font-weight: 600;">All sensors connected</div>
                 </div>
             </div>
@@ -254,9 +272,9 @@ if is_live_mode:
     selected_date = default_date
     active_time = real_live_time
     with c_date:
-        st.markdown(f"<div style='font-size: 15px; font-weight: 700; padding-top: 6px; color: #334155;'>📅 Active Date: <b>{selected_date.strftime('%Y-%m-%d')}</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size: 16px; font-weight: 700; padding-top: 6px; color: #334155;'>📅 Active Date: <b>{selected_date.strftime('%Y-%m-%d')}</b></div>", unsafe_allow_html=True)
     with c_time:
-        st.markdown(f"<div style='font-size: 15px; font-weight: 700; padding-top: 6px; color: #2563eb;'>⏱️ Real-Time Tracking: <b>{active_time.strftime('%H:%M:%S')} (AEST)</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size: 16px; font-weight: 700; padding-top: 6px; color: #2563eb;'>⏱️ Real-Time Tracking: <b>{active_time.strftime('%H:%M:%S')} (AEST)</b></div>", unsafe_allow_html=True)
 else:
     with c_date:
         date_options = [d.strftime('%Y-%m-%d') for d in available_dates]
@@ -283,7 +301,6 @@ df_live = df_day[df_day.index.time <= active_time]
 if df_live.empty:
     df_live = df_day.iloc[:1]
 
-# Current Telemetry Values
 cur_occ = int(df_live['occupancy_now'].iloc[-1])
 pred_occ = int(df_live['occupancy_forecast_15min'].iloc[-1])
 zone_temp = df_live['predictive_room_temperature_C'].iloc[-1]
@@ -299,10 +316,9 @@ cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
 is_cooling = cur_power > 0.05
 hvac_on = cur_power > 0.0
 
-# --- 6. TOP 4 KPI CARDS (LARGE TV READABILITY) ---
+# --- 6. TOP 4 KPI CARDS ---
 kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1.1, 1.3, 1.2, 1.5])
 
-# Card 1: Occupancy
 with kpi_col1:
     arrow = "↑" if pred_occ >= cur_occ else "↓"
     arrow_color = "#dc2626" if pred_occ >= cur_occ else "#16a34a"
@@ -311,86 +327,83 @@ with kpi_col1:
         <div class="card-header-title">👥 Occupancy</div>
         <div style="display: flex; justify-content: space-around; align-items: baseline; text-align: center; margin-top: 4px;">
             <div>
-                <div style="font-size: 14px; color: #64748b; font-weight: 700;">Current</div>
-                <div style="font-size: 46px; font-weight: 900; color: #0f172a; line-height: 1;">{cur_occ}</div>
+                <div style="font-size: 15px; color: #64748b; font-weight: 700;">Current</div>
+                <div style="font-size: 50px; font-weight: 900; color: #0f172a; line-height: 1;">{cur_occ}</div>
                 <div style="font-size: 14px; color: #64748b; font-weight: 600;">people</div>
             </div>
-            <div style="border-left: 2px solid #e2e8f0; height: 60px;"></div>
+            <div style="border-left: 2px solid #e2e8f0; height: 65px;"></div>
             <div>
-                <div style="font-size: 14px; color: #64748b; font-weight: 700;">Predicted<br><span style="font-size: 11px;">+15 min</span></div>
-                <div style="font-size: 46px; font-weight: 900; color: #0f172a; line-height: 1;">{pred_occ} <span style="font-size: 28px; color: {arrow_color};">{arrow}</span></div>
+                <div style="font-size: 15px; color: #64748b; font-weight: 700;">Predicted<br><span style="font-size: 12px;">+15 min</span></div>
+                <div style="font-size: 50px; font-weight: 900; color: #0f172a; line-height: 1;">{pred_occ} <span style="font-size: 30px; color: {arrow_color};">{arrow}</span></div>
                 <div style="font-size: 14px; color: #64748b; font-weight: 600;">people</div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# Card 2: Temperature
 with kpi_col2:
     st.markdown(f"""
     <div class="dashboard-card">
         <div class="card-header-title">🌡️ Temperature (°C)</div>
         <div style="display: flex; justify-content: space-around; align-items: baseline; text-align: center; margin-top: 4px;">
             <div>
-                <div style="font-size: 14px; color: #64748b; font-weight: 700;">Zone Temp.</div>
-                <div style="font-size: 40px; font-weight: 900; color: #0f172a; line-height: 1;">{zone_temp:.1f}</div>
+                <div style="font-size: 15px; color: #64748b; font-weight: 700;">Zone Temp.</div>
+                <div style="font-size: 42px; font-weight: 900; color: #0f172a; line-height: 1;">{zone_temp:.1f}</div>
                 <div style="font-size: 14px; color: #64748b; font-weight: 600;">°C</div>
             </div>
             <div>
-                <div style="font-size: 14px; color: #64748b; font-weight: 700;">Setpoint</div>
-                <div style="font-size: 40px; font-weight: 900; color: #0f172a; line-height: 1;">{setpoint_temp:.1f}</div>
+                <div style="font-size: 15px; color: #64748b; font-weight: 700;">Setpoint</div>
+                <div style="font-size: 42px; font-weight: 900; color: #0f172a; line-height: 1;">{setpoint_temp:.1f}</div>
                 <div style="font-size: 14px; color: #64748b; font-weight: 600;">°C</div>
             </div>
             <div>
-                <div style="font-size: 14px; color: #64748b; font-weight: 700;">Outdoor</div>
-                <div style="font-size: 40px; font-weight: 900; color: #0f172a; line-height: 1;">{outdoor_temp:.1f}</div>
+                <div style="font-size: 15px; color: #64748b; font-weight: 700;">Outdoor</div>
+                <div style="font-size: 42px; font-weight: 900; color: #0f172a; line-height: 1;">{outdoor_temp:.1f}</div>
                 <div style="font-size: 14px; color: #64748b; font-weight: 600;">°C</div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# Card 3: Thermal Comfort
 with kpi_col3:
     is_comfort = (22.8 <= zone_temp <= 25.8)
     comfort_label = "COMFORTABLE" if is_comfort else "DEVIATION"
     comfort_icon = "😊" if is_comfort else "⚠️"
     bg_comfort = "#15803d" if is_comfort else "#b45309"
     st.markdown(f"""
-    <div class="dashboard-card" style="padding: 12px;">
+    <div class="dashboard-card" style="padding: 14px;">
         <div class="card-header-title" style="margin-bottom: 8px;">🍃 Thermal Comfort</div>
         <div class="comfort-card" style="background-color: {bg_comfort};">
-            <span style="font-size: 48px;">{comfort_icon}</span>
+            <span style="font-size: 52px;">{comfort_icon}</span>
             <span class="comfort-text">{comfort_label}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# Card 4: Energy Usage (Today)
 with kpi_col4:
     st.markdown(f"""
     <div class="dashboard-card">
         <div class="card-header-title">⚡ Energy Usage (Today)</div>
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 2px;">
             <div>
-                <div style="font-size: 13px; color: #64748b; font-weight: 700;">Predictive HVAC</div>
-                <div style="font-size: 28px; font-weight: 900; color: #2563eb;">{pred_energy_total:.2f} kWh</div>
+                <div style="font-size: 14px; color: #64748b; font-weight: 700;">Predictive HVAC</div>
+                <div style="font-size: 30px; font-weight: 900; color: #2563eb;">{pred_energy_total:.2f} kWh</div>
             </div>
             <div style="text-align: right;">
-                <div style="font-size: 13px; color: #64748b; font-weight: 700;">Scheduled Baseline</div>
-                <div style="font-size: 28px; font-weight: 900; color: #d97706;">{sched_energy_total:.2f} kWh</div>
+                <div style="font-size: 14px; color: #64748b; font-weight: 700;">Scheduled Baseline</div>
+                <div style="font-size: 30px; font-weight: 900; color: #d97706;">{sched_energy_total:.2f} kWh</div>
             </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px; color: #15803d; font-size: 17px; font-weight: 800; border-top: 1px solid #f1f5f9; padding-top: 8px; margin-top: 4px;">
-            <span style="font-size: 20px;">🍃</span>
+        <div style="display: flex; align-items: center; gap: 10px; color: #15803d; font-size: 18px; font-weight: 800; border-top: 1.5px solid #f1f5f9; padding-top: 10px; margin-top: 6px;">
+            <span style="font-size: 22px;">🍃</span>
             <span>{energy_saved:.2f} kWh ({pct_saved:.1f}%) Energy Saving</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom: 24px;'></div>", unsafe_allow_html=True)
 
-# --- 7. MID-ROW: ENERGY CONSUMPTION & TEMPERATURE TREND ---
+# --- 7. MID-ROW: ENERGY CONSUMPTION & TEMPERATURE TREND (ENLARGED) ---
 chart_col1, chart_col2 = st.columns(2)
 
 with chart_col1:
@@ -400,27 +413,26 @@ with chart_col1:
     fig_energy.add_trace(go.Scatter(
         x=df_live.index, y=df_live['scheduled_hvac_power_kW'],
         mode='lines', name='Scheduled HVAC (Baseline)',
-        line=dict(color='#ea580c', width=3, dash='dash')
+        line=dict(color='#ea580c', width=3.5, dash='dash')
     ))
     fig_energy.add_trace(go.Scatter(
         x=df_live.index, y=df_live['predictive_hvac_power_kW'],
         mode='lines', name='Predictive HVAC (Actual)',
-        line=dict(color='#0284c7', width=3.5),
-        fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.12)'
+        line=dict(color='#0284c7', width=4),
+        fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.14)'
     ))
     
-    # Live vertical red cursor
     fig_energy.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
     
     fig_energy.update_layout(
-        height=380,
+        height=420,
         margin=dict(l=25, r=25, t=10, b=25),
         xaxis_title="", yaxis_title="Power (kW)",
         plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-        font=dict(color="#334155", size=14),
-        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[datetime.combine(selected_date, time(8, 0)), datetime.combine(selected_date, time(22, 0))]),
-        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), zeroline=False),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=13))
+        font=dict(color="#334155", size=15),
+        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[datetime.combine(selected_date, time(8, 0)), datetime.combine(selected_date, time(22, 0))]),
+        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), zeroline=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
     st.plotly_chart(fig_energy, use_container_width=True)
 
@@ -430,35 +442,35 @@ with chart_col2:
     
     fig_temp.add_hrect(
         y0=22.8, y1=25.8, line_width=0, fillcolor="#22c55e", opacity=0.15,
-        annotation_text="Comfort Range (22.8 - 25.8°C)", annotation_position="top right", annotation_font_size=12
+        annotation_text="Comfort Range (22.8 - 25.8°C)", annotation_position="top right", annotation_font_size=13
     )
     fig_temp.add_trace(go.Scatter(
         x=df_live.index, y=df_live['outdoor_temperature_C'],
         mode='lines', name='Outdoor Temperature',
-        line=dict(color='#f97316', width=3)
+        line=dict(color='#f97316', width=3.5)
     ))
-    fig_temp.add_hline(y=24.0, line_dash="dash", line_color="#10b981", line_width=2, annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=12)
+    fig_temp.add_hline(y=24.0, line_dash="dash", line_color="#10b981", line_width=2.5, annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=13)
     fig_temp.add_trace(go.Scatter(
         x=df_live.index, y=df_live['predictive_room_temperature_C'],
         mode='lines', name='Zone Temperature',
-        line=dict(color='#0284c7', width=3.5)
+        line=dict(color='#0284c7', width=4)
     ))
     
     fig_temp.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
 
     fig_temp.update_layout(
-        height=380,
+        height=420,
         margin=dict(l=25, r=25, t=10, b=25),
         xaxis_title="", yaxis_title="Temperature (°C)",
         plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-        font=dict(color="#334155", size=14),
-        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[datetime.combine(selected_date, time(8, 0)), datetime.combine(selected_date, time(22, 0))]),
-        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[16, 32]),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=13))
+        font=dict(color="#334155", size=15),
+        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[datetime.combine(selected_date, time(8, 0)), datetime.combine(selected_date, time(22, 0))]),
+        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[16, 32]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
     st.plotly_chart(fig_temp, use_container_width=True)
 
-st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom: 24px;'></div>", unsafe_allow_html=True)
 
 # --- 8. BOTTOM ROW: DEVICE STATUS & OCCUPANCY/MODE ---
 bot_col1, bot_col2 = st.columns([1.1, 1.9])
@@ -500,30 +512,33 @@ with bot_col2:
     fig_occ.add_trace(go.Bar(
         x=df_live.index, y=(df_live['predictive_hvac_power_kW'] > 0).astype(int) * 45,
         name='HVAC Mode (Active)',
-        marker_color='rgba(191, 219, 254, 0.65)',
+        marker_color='rgba(191, 219, 254, 0.7)',
         width=1000 * 60 * 4
     ))
     fig_occ.add_trace(go.Scatter(
         x=df_live.index, y=df_live['occupancy_forecast_15min'],
         mode='lines', name='Predicted Occupancy (+15 min)',
-        line=dict(color='#f97316', width=3, dash='dash')
+        line=dict(color='#f97316', width=3.5, dash='dash')
     ))
     fig_occ.add_trace(go.Scatter(
         x=df_live.index, y=df_live['occupancy_now'],
         mode='lines', name='Actual Occupancy',
-        line=dict(color='#0284c7', width=3.5)
+        line=dict(color='#0284c7', width=4)
     ))
     
     fig_occ.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
 
     fig_occ.update_layout(
-        height=360,
+        height=400,
         margin=dict(l=25, r=25, t=10, b=25),
         xaxis_title="", yaxis_title="People",
         plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-        font=dict(color="#334155", size=14),
-        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[datetime.combine(selected_date, time(8, 0)), datetime.combine(selected_date, time(22, 0))]),
-        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[0, 50]),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=13))
+        font=dict(color="#334155", size=15),
+        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[datetime.combine(selected_date, time(8, 0)), datetime.combine(selected_date, time(22, 0))]),
+        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[0, 50]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
     st.plotly_chart(fig_occ, use_container_width=True)
+
+# Extra spacer to ensure continuous scrolling is active on all screen sizes
+st.markdown("<div style='height: 120px;'></div>", unsafe_allow_html=True)
