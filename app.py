@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import streamlit.components.v1 as components
 from datetime import datetime, date, time, timezone, timedelta
 
-# Auto-refresh helper (optional)
+# Auto-refresh helper to continuously move data
 try:
     from streamlit_autorefresh import st_autorefresh
-    st_autorefresh(interval=30000, key="data_refresh")
+    st_autorefresh(interval=30000, key="data_loop_refresh")
 except Exception:
     pass
 
@@ -18,9 +19,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS scaled specifically for 1080p / 4K TV screens
 st.markdown("""
 <style>
+    /* Clean, high-contrast light background */
     .stApp {
         background-color: #f8fafc !important;
         color: #0f172a !important;
@@ -40,29 +41,34 @@ st.markdown("""
     /* Search Toolbar */
     .filter-toolbar {
         background-color: #ffffff;
-        border: 1px solid #cbd5e1;
+        border: 1.5px solid #cbd5e1;
         border-radius: 14px;
         padding: 10px 18px;
         margin-bottom: 16px;
-        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.04);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     }
     
-    /* Large Screen Card Containers */
+    /* Eye-Catching TV Card Containers */
     .dashboard-card {
         background-color: #ffffff;
-        border: 1px solid #cbd5e1;
+        border: 1.5px solid #cbd5e1;
         border-radius: 16px;
-        padding: 18px 24px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        padding: 20px 24px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
         height: 100%;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .dashboard-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
     }
     
     .card-header-title {
-        font-size: 18px;
-        font-weight: 700;
+        font-size: 19px;
+        font-weight: 800;
         color: #1e293b;
         display: flex;
         align-items: center;
@@ -70,22 +76,27 @@ st.markdown("""
         margin-bottom: 10px;
     }
     
-    /* Green Comfort Hero Badge */
+    /* Pulsing Green Comfort Hero Badge */
     .comfort-card {
-        background-color: #15803d;
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
         color: #ffffff;
         border-radius: 16px;
-        padding: 24px 20px;
+        padding: 22px 20px;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 18px;
         height: 100%;
-        box-shadow: 0 6px 14px rgba(21, 128, 61, 0.25);
+        box-shadow: 0 6px 20px rgba(22, 163, 74, 0.35);
+        animation: comfortPulse 3s infinite;
+    }
+    @keyframes comfortPulse {
+        0%, 100% { box-shadow: 0 0 16px rgba(22, 163, 74, 0.3); }
+        50% { box-shadow: 0 0 28px rgba(22, 163, 74, 0.6); }
     }
     .comfort-text {
         font-size: 32px;
-        font-weight: 800;
+        font-weight: 900;
         letter-spacing: 1px;
     }
     
@@ -106,7 +117,7 @@ st.markdown("""
         padding: 11px 18px;
         border-bottom: 1px solid #f1f5f9;
         color: #0f172a;
-        font-weight: 500;
+        font-weight: 600;
     }
     .badge-on {
         color: #16a34a;
@@ -123,17 +134,51 @@ st.markdown("""
         gap: 8px;
     }
     .circle-dot {
-        height: 13px;
-        width: 13px;
+        height: 14px;
+        width: 14px;
         border-radius: 50%;
         display: inline-block;
+        animation: blinkLive 2s infinite ease-in-out;
     }
-    .circle-green { background-color: #16a34a; box-shadow: 0 0 6px rgba(22, 163, 74, 0.6); }
+    @keyframes blinkLive {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(1.15); }
+    }
+    .circle-green { background-color: #16a34a; box-shadow: 0 0 8px rgba(22, 163, 74, 0.8); }
     .circle-gray { background-color: #94a3b8; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. DATA LOADING ---
+# --- 2. AUTOMATIC SMOOTH SCREEN SCROLL LOOP (FOR CONTINUOUS TV DISPLAY) ---
+components.html("""
+<script>
+    const parentWin = window.parent;
+    let scrollSpeed = 1;      // Speed: 1px per step
+    let intervalTime = 30;    // Step interval in ms
+    let isPaused = false;
+
+    function autoScroll() {
+        if (!isPaused && parentWin) {
+            let maxScroll = parentWin.document.documentElement.scrollHeight - parentWin.innerHeight;
+            let currentScroll = parentWin.scrollY || parentWin.pageYOffset;
+
+            // When approaching the bottom, pause briefly and smoothly return to top
+            if (currentScroll >= maxScroll - 3) {
+                isPaused = true;
+                setTimeout(() => {
+                    parentWin.scrollTo({ top: 0, behavior: 'smooth' });
+                    setTimeout(() => { isPaused = false; }, 3000); // 3-second pause at the top
+                }, 2500); // 2.5-second pause at the bottom
+            } else {
+                parentWin.scrollBy(0, scrollSpeed);
+            }
+        }
+    }
+    setInterval(autoScroll, intervalTime);
+</script>
+""", height=0, width=0)
+
+# --- 3. DATA LOADING ---
 @st.cache_data(ttl=60)
 def load_data():
     try:
@@ -147,14 +192,12 @@ def load_data():
         df = df.set_index('timestamp')
 
     df = df.sort_index()
-    df['sched_energy_step'] = df['scheduled_energy_cumulative_kWh'].diff().fillna(0).clip(lower=0)
-    df['pred_energy_step'] = df['predictive_energy_cumulative_kWh'].diff().fillna(0).clip(lower=0)
     return df
 
 df_full = load_data()
 available_dates = df_full.index.normalize().unique().date
 
-# Default to Sep 29 or latest date
+# Default to Sep 29 or latest available date
 sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
 default_date = sep29_dates[0] if sep29_dates else available_dates[-1]
 
@@ -169,13 +212,13 @@ except Exception:
 
 real_live_time = now_melbourne.time()
 
-# --- 3. TOP HEADER BAR ---
+# --- 4. TOP HEADER BAR ---
 col_head_left, col_head_mid, col_head_right = st.columns([2.5, 1.3, 1.0])
 
 with col_head_left:
     st.markdown("""
         <div style="line-height: 1.2;">
-            <div style="font-size: 34px; font-weight: 800; color: #0f172a;">Innovation Lab – HVAC Monitoring</div>
+            <div style="font-size: 34px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px;">Innovation Lab – HVAC Monitoring</div>
             <div style="font-size: 18px; font-weight: 600; color: #64748b; margin-top: 3px;">Occupancy Prediction Based Control</div>
         </div>
     """, unsafe_allow_html=True)
@@ -185,13 +228,13 @@ with col_head_mid:
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 24px; margin-top: 6px;">
             <div style="text-align: right; line-height: 1.2;">
                 <div style="font-size: 14px; color: #64748b; font-weight: 700;">📅 {default_date.strftime('%a, %d %b %Y')}</div>
-                <div style="font-size: 24px; font-weight: 800; color: #0f172a;">{real_live_time.strftime('%H:%M:%S')}</div>
+                <div style="font-size: 24px; font-weight: 900; color: #0f172a;">{real_live_time.strftime('%H:%M:%S')}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="height: 16px; width: 16px; background-color: #22c55e; border-radius: 50%; display: inline-block; box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);"></span>
+                <span class="circle-dot circle-green"></span>
                 <div style="line-height: 1.1;">
                     <div style="font-size: 16px; font-weight: 800; color: #0f172a;">System Online</div>
-                    <div style="font-size: 12px; color: #64748b; font-weight: 500;">All sensors connected</div>
+                    <div style="font-size: 12px; color: #64748b; font-weight: 600;">All sensors connected</div>
                 </div>
             </div>
         </div>
@@ -200,7 +243,7 @@ with col_head_mid:
 with col_head_right:
     st.selectbox("Select Zone:", ["Zone: Innovation Lab", "Zone: Meeting Room", "Zone: Open Workspace"], label_visibility="collapsed")
 
-# --- 4. SEARCHABLE DATE & TIME CONTROL TOOLBAR ---
+# --- 5. SEARCHABLE DATE & TIME CONTROL TOOLBAR ---
 st.markdown("<div class='filter-toolbar'>", unsafe_allow_html=True)
 c_mode, c_date, c_time = st.columns([1.1, 1.4, 2.0])
 
@@ -211,12 +254,11 @@ if is_live_mode:
     selected_date = default_date
     active_time = real_live_time
     with c_date:
-        st.markdown(f"<div style='font-size: 15px; font-weight: 600; padding-top: 6px; color: #334155;'>📅 Active Date: <b>{selected_date.strftime('%Y-%m-%d')}</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size: 15px; font-weight: 700; padding-top: 6px; color: #334155;'>📅 Active Date: <b>{selected_date.strftime('%Y-%m-%d')}</b></div>", unsafe_allow_html=True)
     with c_time:
-        st.markdown(f"<div style='font-size: 15px; font-weight: 600; padding-top: 6px; color: #2563eb;'>⏱️ Real-Time Tracking: <b>{active_time.strftime('%H:%M:%S')} (AEST)</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size: 15px; font-weight: 700; padding-top: 6px; color: #2563eb;'>⏱️ Real-Time Tracking: <b>{active_time.strftime('%H:%M:%S')} (AEST)</b></div>", unsafe_allow_html=True)
 else:
     with c_date:
-        # Searchable Date Dropdown
         date_options = [d.strftime('%Y-%m-%d') for d in available_dates]
         default_idx = date_options.index(default_date.strftime('%Y-%m-%d')) if default_date.strftime('%Y-%m-%d') in date_options else len(date_options)-1
         sel_date_str = st.selectbox("🔍 Search Date:", options=date_options, index=default_idx)
@@ -226,7 +268,6 @@ else:
     day_times = [t.strftime('%H:%M') for t in df_day_candidates.index.time]
 
     with c_time:
-        # Searchable Time Dropdown
         if len(day_times) > 0:
             sel_time_str = st.select_slider("🔍 Scrub / Select Time:", options=day_times, value=day_times[len(day_times)//2])
             h, m = map(int, sel_time_str.split(':'))
@@ -258,7 +299,7 @@ cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
 is_cooling = cur_power > 0.05
 hvac_on = cur_power > 0.0
 
-# --- 5. TOP 4 KPI CARDS (TV SCALED) ---
+# --- 6. TOP 4 KPI CARDS (LARGE TV READABILITY) ---
 kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1.1, 1.3, 1.2, 1.5])
 
 # Card 1: Occupancy
@@ -349,7 +390,7 @@ with kpi_col4:
 
 st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
 
-# --- 6. MID-ROW: ENERGY CONSUMPTION & TEMPERATURE TREND (LARGER PLOTS) ---
+# --- 7. MID-ROW: ENERGY CONSUMPTION & TEMPERATURE TREND ---
 chart_col1, chart_col2 = st.columns(2)
 
 with chart_col1:
@@ -367,6 +408,9 @@ with chart_col1:
         line=dict(color='#0284c7', width=3.5),
         fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.12)'
     ))
+    
+    # Live vertical red cursor
+    fig_energy.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
     
     fig_energy.update_layout(
         height=380,
@@ -399,6 +443,8 @@ with chart_col2:
         mode='lines', name='Zone Temperature',
         line=dict(color='#0284c7', width=3.5)
     ))
+    
+    fig_temp.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
 
     fig_temp.update_layout(
         height=380,
@@ -414,7 +460,7 @@ with chart_col2:
 
 st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
 
-# --- 7. BOTTOM ROW: DEVICE STATUS & OCCUPANCY/MODE ---
+# --- 8. BOTTOM ROW: DEVICE STATUS & OCCUPANCY/MODE ---
 bot_col1, bot_col2 = st.columns([1.1, 1.9])
 
 with bot_col1:
@@ -425,7 +471,7 @@ with bot_col1:
     damper_str = "<span class='badge-on'><span class='circle-dot circle-green'></span> OPEN</span>" if cur_occ > 0 else "<span class='badge-off'><span class='circle-dot circle-gray'></span> MINIMUM</span>"
     
     table_html = f"""
-    <div style="background-color: #ffffff; border-radius: 14px; border: 1px solid #cbd5e1; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+    <div style="background-color: #ffffff; border-radius: 14px; border: 1.5px solid #cbd5e1; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
         <table class="status-table">
             <thead>
                 <tr>
@@ -467,6 +513,8 @@ with bot_col2:
         mode='lines', name='Actual Occupancy',
         line=dict(color='#0284c7', width=3.5)
     ))
+    
+    fig_occ.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
 
     fig_occ.update_layout(
         height=360,
