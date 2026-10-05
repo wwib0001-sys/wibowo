@@ -2,165 +2,135 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import streamlit.components.v1 as components
 from datetime import datetime, date, time, timezone, timedelta
 
-# Auto-refresh helper (only triggers in live mode)
+# Auto-refresh helper (optional)
 try:
     from streamlit_autorefresh import st_autorefresh
+    st_autorefresh(interval=30000, key="data_refresh")
 except Exception:
-    st_autorefresh = None
+    pass
 
-# --- 1. PAGE CONFIGURATION & DARK-BLUE STYLING ---
+# --- 1. PAGE CONFIGURATION & STYLING ---
 st.set_page_config(
-    page_title="HVAC Monitoring Dashboard based on Occupancy Prediction", 
-    layout="wide", 
+    page_title="Innovation Lab – HVAC Monitoring",
+    layout="wide",
     initial_sidebar_state="collapsed"
 )
 
+# Custom CSS matching the reference UI design
 st.markdown("""
 <style>
-    /* Dark-blue application background */
+    /* Clean light background matching the target UI */
     .stApp {
-        background-color: #0a1128 !important;
-        color: #f1f5f9 !important;
+        background-color: #f1f5f9 !important;
+        color: #1e293b !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
-    /* Completely hide sidebar */
+    /* Hide default sidebar */
     [data-testid="stSidebar"], section[data-testid="stSidebar"] {
         display: none !important;
     }
     
     .main .block-container {
-        padding-top: 1.5rem;
+        padding-top: 1.2rem;
         padding-bottom: 2rem;
-        max-width: 96%;
+        max-width: 98%;
     }
     
-    /* Control Toolbar Card */
-    .control-card {
-        background-color: #121e3a;
-        border: 1px solid #1e325c;
-        border-radius: 12px;
-        padding: 12px 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-    }
-    
-    /* Dark-blue Metric Cards */
-    .metric-card {
-        background-color: #121e3a;
-        border: 1px solid #1e325c;
-        border-radius: 12px;
-        padding: 18px;
-        text-align: center;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    /* White Card Containers */
+    .dashboard-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 16px 20px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
         height: 100%;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-    }
-    .metric-title { 
-        color: #94a3b8; 
-        font-size: 12px; 
-        font-weight: 700; 
-        text-transform: uppercase; 
-        letter-spacing: 0.8px;
-        margin-bottom: 6px; 
-    }
-    .metric-value { 
-        color: #ffffff; 
-        font-size: 30px; 
-        font-weight: bold; 
-    }
-    .metric-subtext { 
-        color: #38bdf8; 
-        font-size: 14px; 
-        font-weight: 600; 
-        margin-top: 4px; 
+        justify-content: space-between;
     }
     
-    /* Header Clock Banner Card */
-    .clock-card {
-        background-color: #121e3a;
-        border: 1px solid #1e325c;
-        border-radius: 12px;
-        padding: 14px 22px;
+    .card-header-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-    }
-    .status-badge {
-        display: inline-flex;
-        align-items: center;
         gap: 8px;
-        font-weight: 700;
-        font-size: 24px;
-    }
-    .circle-indicator { 
-        width: 18px; 
-        height: 18px; 
-        border-radius: 50%; 
-        display: inline-block;
-    }
-    .circle-on { 
-        background: radial-gradient(circle at 30% 30%, #4ade80, #16a34a); 
-        box-shadow: 0 0 12px rgba(74, 222, 128, 0.6); 
-    }
-    .circle-off { 
-        background: radial-gradient(circle at 30% 30%, #94a3b8, #475569); 
-    }
-    
-    h1, h2, h3, h4, p {
-        color: #ffffff !important;
-    }
-    .sub-description {
-        color: #94a3b8 !important;
-        font-size: 15px;
-        margin-top: -8px;
         margin-bottom: 12px;
     }
+    
+    /* Green Comfort Hero Badge */
+    .comfort-card {
+        background-color: #15803d;
+        color: #ffffff;
+        border-radius: 14px;
+        padding: 18px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        height: 100%;
+        box-shadow: 0 4px 10px rgba(21, 128, 61, 0.25);
+    }
+    .comfort-text {
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Device Status Table Styling */
+    .status-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+    }
+    .status-table th {
+        background-color: #e2e8f0;
+        color: #475569;
+        font-weight: 700;
+        padding: 8px 12px;
+        text-align: left;
+    }
+    .status-table td {
+        padding: 7px 12px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #1e293b;
+    }
+    .badge-on {
+        color: #16a34a;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .badge-off {
+        color: #94a3b8;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .circle-dot {
+        height: 9px;
+        width: 9px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .circle-green { background-color: #16a34a; }
+    .circle-gray { background-color: #94a3b8; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. AUTOMATIC LOOPING SCROLLER SCRIPT ---
-components.html("""
-<script>
-    const parentWin = window.parent;
-    let scrollSpeed = 1;
-    let intervalTime = 30;
-    let isPaused = false;
-
-    function autoScroll() {
-        if (!isPaused && parentWin) {
-            let maxScroll = parentWin.document.documentElement.scrollHeight - parentWin.innerHeight;
-            let currentScroll = parentWin.scrollY || parentWin.pageYOffset;
-
-            if (currentScroll >= maxScroll - 2) {
-                isPaused = true;
-                setTimeout(() => {
-                    parentWin.scrollTo({ top: 0, behavior: 'smooth' });
-                    setTimeout(() => {
-                        isPaused = false;
-                    }, 2500);
-                }, 2000);
-            } else {
-                parentWin.scrollBy(0, scrollSpeed);
-            }
-        }
-    }
-    setInterval(autoScroll, intervalTime);
-</script>
-""", height=0, width=0)
-
-# --- 3. DATA LOADING DIRECTLY FROM HVAC CSV ---
+# --- 2. DATA LOADING & PRE-PROCESSING ---
 @st.cache_data(ttl=60)
 def load_data():
     try:
         df = pd.read_csv('hvac_comparison.csv')
     except Exception as e:
-        st.error(f"Could not read CSV: {e}")
+        st.error(f"Could not read dataset: {e}")
         st.stop()
 
     if 'timestamp' in df.columns:
@@ -169,29 +139,22 @@ def load_data():
 
     df = df.sort_index()
 
-    # Map standard columns
-    df['occ_true'] = df['occupancy_now']
-    df['occ_pred'] = df['occupancy_forecast_15min']
-    df['occ_actual_15m'] = df['occupancy_actual_15min_later']
-    df['T_pred'] = df['predictive_room_temperature_C']
-    df['power_pred'] = df['predictive_hvac_power_kW']
-    
-    # Calculate interval energy from cumulative
-    df['energy_interval_pred'] = df['predictive_energy_cumulative_kWh'].diff().fillna(0).clip(lower=0)
+    # Calculate interval energy consumption
+    df['sched_energy_step'] = df['scheduled_energy_cumulative_kWh'].diff().fillna(0).clip(lower=0)
+    df['pred_energy_step'] = df['predictive_energy_cumulative_kWh'].diff().fillna(0).clip(lower=0)
     
     return df
 
 df_full = load_data()
 available_dates = df_full.index.normalize().unique().date
 
-# --- 4. HEADER: TITLE & CLOCK BANNER ---
-col_head_left, col_head_right = st.columns([2.3, 1.1])
+# Select date (defaulting to Sep 29 if available, or the latest available date)
+sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
+selected_date = sep29_dates[0] if sep29_dates else available_dates[-1]
 
-with col_head_left:
-    st.title("🏢 Smart HVAC Monitoring Dashboard based on Occupancy Prediction")
-    st.markdown("<div class='sub-description'>Real-time facility environmental monitoring, equipment control state, and predictive demand tracking.</div>", unsafe_allow_html=True)
+df_day = df_full[df_full.index.date == selected_date].copy()
 
-# Live Melbourne current time
+# Real-time Melbourne Clock
 try:
     import pytz
     melbourne_tz = pytz.timezone('Australia/Melbourne')
@@ -200,297 +163,294 @@ except Exception:
     melbourne_tz = timezone(timedelta(hours=10))
     now_melbourne = datetime.now(melbourne_tz)
 
-real_live_time = now_melbourne.time()
+live_time = now_melbourne.time()
 
-# --- 5. CONTROL TOOLBAR: LIVE VS. HISTORICAL FILTER ---
-st.markdown("<div class='control-card'>", unsafe_allow_html=True)
-col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([1, 1.2, 2])
-
-with col_ctrl1:
-    is_live_mode = st.toggle("🔴 Real-Time Live Mode", value=True, help="Toggle OFF to inspect historical dates and filter system time.")
-
-if is_live_mode:
-    if st_autorefresh:
-        st_autorefresh(interval=30000, key="live_refresh")
-
-    sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
-    selected_date = sep29_dates[0] if sep29_dates else available_dates[-1]
-    active_time = real_live_time
-    mode_label = "LIVE SYSTEM CLOCK"
-    clock_color = "#ef4444"
-
-    with col_ctrl2:
-        st.write(f"📅 **Tracking Date:** {selected_date.strftime('%Y-%m-%d')}")
-    with col_ctrl3:
-        st.write(f"⏱️ **Tracking Mode:** Dynamic Real-Time Clock Sync ({active_time.strftime('%H:%M:%S')})")
-else:
-    mode_label = "INSPECTION MODE"
-    clock_color = "#38bdf8"
-    
-    with col_ctrl2:
-        selected_date = st.selectbox(
-            "📅 Select Filter Date:", 
-            options=available_dates, 
-            index=len(available_dates)-1
-        )
-    
-    df_day_candidates = df_full[df_full.index.date == selected_date]
-    day_times = df_day_candidates.index.time
-    
-    with col_ctrl3:
-        if len(day_times) > 0:
-            active_time = st.select_slider("⏱️ Scrub Inspection Time:", options=day_times, value=day_times[-1])
-        else:
-            active_time = time(23, 59)
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-# Render clock banner matching selected mode
-with col_head_right:
-    st.markdown(f"""
-    <div class="clock-card">
-        <div>
-            <div style="font-size: 11px; font-weight: bold; color: {clock_color}; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px;">
-                <span style="height: 8px; width: 8px; background-color: {clock_color}; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px {clock_color};"></span>
-                {mode_label}
-            </div>
-            <div style="font-size: 15px; font-weight: 600; color: #e2e8f0; margin-top: 3px;">
-                {selected_date.strftime('%A, %b %d, %Y')}
-            </div>
-        </div>
-        <div style="text-align: right;">
-            <div style="font-size: 11px; color: #94a3b8; font-weight: 600;">MELBOURNE TIME</div>
-            <div style="font-size: 26px; font-weight: bold; color: #38bdf8; line-height: 1.1;">
-                {active_time.strftime('%H:%M:%S')}
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# --- 6. DATA FILTERING & CORE METRIC VALUES ---
-df_day = df_full[df_full.index.date == selected_date].copy()
-df_live = df_day[df_day.index.time <= active_time]
-
+# Filter data up to current time (with fallback for full day inspection)
+df_live = df_day[df_day.index.time <= live_time]
 if df_live.empty:
     df_live = df_day.iloc[:1]
 
-current_temp = df_live['T_pred'].iloc[-1]
-current_power = df_live['power_pred'].iloc[-1]
-current_occ = int(df_live['occ_true'].iloc[-1])
-forecast_occ = int(df_live['occ_pred'].iloc[-1])
-total_energy_today = df_live['energy_interval_pred'].sum()
+# Current Telemetry Values
+cur_occ = int(df_live['occupancy_now'].iloc[-1])
+pred_occ = int(df_live['occupancy_forecast_15min'].iloc[-1])
+zone_temp = df_live['predictive_room_temperature_C'].iloc[-1]
+outdoor_temp = df_live['outdoor_temperature_C'].iloc[-1]
+setpoint_temp = 24.0
 
-# Compute Realisation Statistics (Day-to-Date)
-eval_subset = df_live.dropna(subset=['occ_pred', 'occ_actual_15m'])
-if len(eval_subset) > 0:
-    mae_val = np.mean(np.abs(eval_subset['occ_actual_15m'] - eval_subset['occ_pred']))
-    rmse_val = np.sqrt(np.mean((eval_subset['occ_actual_15m'] - eval_subset['occ_pred'])**2))
-    bin_actual = (eval_subset['occ_actual_15m'] > 0).astype(int)
-    bin_pred = (eval_subset['occ_pred'] > 0).astype(int)
-    bin_acc = np.mean(bin_actual == bin_pred) * 100
-else:
-    mae_val, rmse_val, bin_acc = 0.0, 0.0, 100.0
+# Energy Metrics
+pred_energy_total = df_live['predictive_energy_cumulative_kWh'].iloc[-1]
+sched_energy_total = df_live['scheduled_energy_cumulative_kWh'].iloc[-1]
+energy_saved = max(0.0, sched_energy_total - pred_energy_total)
+pct_saved = (energy_saved / sched_energy_total * 100) if sched_energy_total > 0 else 0.0
 
-if current_power > 0:
-    hvac_status_html = "<span class='status-badge' style='color: #4ade80;'><span class='circle-indicator circle-on'></span> RUNNING</span>"
-else:
-    hvac_status_html = "<span class='status-badge' style='color: #94a3b8;'><span class='circle-indicator circle-off'></span> STANDBY</span>"
+cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
+is_cooling = cur_power > 0.05
+hvac_on = cur_power > 0.0
 
-# --- 7. TOP KPI CARDS ---
-col1, col2, col3, col4, col5 = st.columns([1.1, 1, 1, 1.2, 1.2])
+# --- 3. TOP HEADER BAR ---
+col_head_left, col_head_mid, col_head_right = st.columns([2.5, 1.2, 0.9])
 
-with col1:
+with col_head_left:
+    st.markdown("""
+        <div style="line-height: 1.2;">
+            <div style="font-size: 26px; font-weight: 800; color: #0f172a;">Innovation Lab – HVAC Monitoring</div>
+            <div style="font-size: 14px; font-weight: 600; color: #64748b; margin-top: 2px;">Occupancy Prediction Based Control</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_head_mid:
     st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Device Status</div>
-        <div class="metric-value">{hvac_status_html}</div>
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 20px; margin-top: 4px;">
+            <div style="text-align: right; line-height: 1.2;">
+                <div style="font-size: 12px; color: #64748b; font-weight: 600;">📅 {selected_date.strftime('%a, %d %b %Y')}</div>
+                <div style="font-size: 16px; font-weight: 800; color: #0f172a;">{live_time.strftime('%H:%M:%S')}</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="height: 12px; width: 12px; background-color: #22c55e; border-radius: 50%; display: inline-block;"></span>
+                <div style="line-height: 1.1;">
+                    <div style="font-size: 13px; font-weight: 700; color: #0f172a;">System Online</div>
+                    <div style="font-size: 10px; color: #64748b;">All sensors connected</div>
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_head_right:
+    st.selectbox("Select Zone:", ["Zone: Innovation Lab", "Zone: Meeting Room", "Zone: Open Workspace"], label_visibility="collapsed")
+
+st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
+
+# --- 4. TOP 4 KPI CARDS ---
+kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1.1, 1.3, 1.2, 1.4])
+
+# Card 1: Occupancy
+with kpi_col1:
+    arrow = "↑" if pred_occ >= cur_occ else "↓"
+    arrow_color = "#dc2626" if pred_occ >= cur_occ else "#16a34a"
+    st.markdown(f"""
+    <div class="dashboard-card">
+        <div class="card-header-title">👥 Occupancy</div>
+        <div style="display: flex; justify-content: space-around; align-items: baseline; text-align: center;">
+            <div>
+                <div style="font-size: 11px; color: #64748b; font-weight: 600;">Current</div>
+                <div style="font-size: 32px; font-weight: 800; color: #0f172a;">{cur_occ}</div>
+                <div style="font-size: 11px; color: #64748b;">people</div>
+            </div>
+            <div style="border-left: 1px solid #e2e8f0; height: 45px;"></div>
+            <div>
+                <div style="font-size: 11px; color: #64748b; font-weight: 600;">Predicted<br><span style="font-size: 9px;">+15 min</span></div>
+                <div style="font-size: 32px; font-weight: 800; color: #0f172a;">{pred_occ} <span style="font-size: 20px; color: {arrow_color};">{arrow}</span></div>
+                <div style="font-size: 11px; color: #64748b;">people</div>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-with col2:
+# Card 2: Temperature
+with kpi_col2:
     st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Indoor Temp</div>
-        <div class="metric-value">{current_temp:.1f} °C</div>
+    <div class="dashboard-card">
+        <div class="card-header-title">🌡️ Temperature (°C)</div>
+        <div style="display: flex; justify-content: space-around; align-items: baseline; text-align: center;">
+            <div>
+                <div style="font-size: 11px; color: #64748b; font-weight: 600;">Zone Temp.</div>
+                <div style="font-size: 28px; font-weight: 800; color: #0f172a;">{zone_temp:.1f}</div>
+                <div style="font-size: 11px; color: #64748b;">°C</div>
+            </div>
+            <div>
+                <div style="font-size: 11px; color: #64748b; font-weight: 600;">Setpoint</div>
+                <div style="font-size: 28px; font-weight: 800; color: #0f172a;">{setpoint_temp:.1f}</div>
+                <div style="font-size: 11px; color: #64748b;">°C</div>
+            </div>
+            <div>
+                <div style="font-size: 11px; color: #64748b; font-weight: 600;">Outdoor</div>
+                <div style="font-size: 28px; font-weight: 800; color: #0f172a;">{outdoor_temp:.1f}</div>
+                <div style="font-size: 11px; color: #64748b;">°C</div>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-with col3:
+# Card 3: Thermal Comfort
+with kpi_col3:
+    is_comfort = (22.8 <= zone_temp <= 25.8)
+    comfort_label = "COMFORTABLE" if is_comfort else "DEVIATION"
+    comfort_icon = "😊" if is_comfort else "⚠️"
+    bg_comfort = "#15803d" if is_comfort else "#b45309"
     st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Total Energy</div>
-        <div class="metric-value">{total_energy_today:.1f} kWh</div>
+    <div class="dashboard-card" style="padding: 10px;">
+        <div class="card-header-title" style="margin-bottom: 6px;">🍃 Thermal Comfort</div>
+        <div class="comfort-card" style="background-color: {bg_comfort};">
+            <span style="font-size: 34px;">{comfort_icon}</span>
+            <span class="comfort-text">{comfort_label}</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-with col4:
+# Card 4: Energy Usage (Today)
+with kpi_col4:
     st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Occupancy Demand</div>
-        <div class="metric-value">{current_occ} <span style="font-size: 15px; font-weight: normal; color: #94a3b8;">Now</span></div>
-        <div class="metric-subtext">📈 Forecast (15m): {forecast_occ}</div>
+    <div class="dashboard-card">
+        <div class="card-header-title">⚡ Energy Usage (Today)</div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+            <div>
+                <div style="font-size: 11px; color: #64748b; font-weight: 600;">Predictive HVAC</div>
+                <div style="font-size: 22px; font-weight: 800; color: #2563eb;">{pred_energy_total:.2f} kWh</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 11px; color: #64748b; font-weight: 600;">Scheduled HVAC (Baseline)</div>
+                <div style="font-size: 22px; font-weight: 800; color: #d97706;">{sched_energy_total:.2f} kWh</div>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; color: #15803d; font-size: 14px; font-weight: 700; border-top: 1px solid #f1f5f9; padding-top: 6px;">
+            <span>🍃</span>
+            <span>{energy_saved:.2f} kWh ({pct_saved:.1f}%) Energy Saving</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-with col5:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-title">Prediction Realisation</div>
-        <div class="metric-value">{bin_acc:.1f}% <span style="font-size: 14px; font-weight: normal; color: #94a3b8;">State Acc</span></div>
-        <div class="metric-subtext">MAE: {mae_val:.2f} | RMSE: {rmse_val:.2f}</div>
-    </div>
-    """, unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
+# --- 5. MID-ROW: ENERGY CONSUMPTION & TEMPERATURE TREND ---
+chart_col1, chart_col2 = st.columns(2)
 
-# --- 8. REUSABLE PLOT HELPER ---
-def create_dark_blue_plot(data, y_col, title, y_label, line_color, is_area=False, is_step=False, hlines=None):
-    fig = go.Figure()
+# Chart 1: Energy Consumption
+with chart_col1:
+    st.markdown("<div class='card-header-title'>📊 Energy Consumption</div>", unsafe_allow_html=True)
+    fig_energy = go.Figure()
     
-    if not data.empty and y_col in data.columns:
-        if is_area:
-            r = int(line_color.lstrip("#")[0:2], 16)
-            g = int(line_color.lstrip("#")[2:4], 16)
-            b = int(line_color.lstrip("#")[4:6], 16)
-            fill_color = f'rgba({r}, {g}, {b}, 0.2)'
-            fig.add_trace(go.Scatter(
-                x=data.index, y=data[y_col], 
-                mode='lines', 
-                line=dict(color=line_color, width=2.5), 
-                fill='tozeroy', 
-                fillcolor=fill_color, 
-                name=y_label
-            ))
-        elif is_step:
-            fig.add_trace(go.Scatter(
-                x=data.index, y=data[y_col], 
-                mode='lines', 
-                line=dict(color=line_color, width=2.5), 
-                line_shape='hv', 
-                name=y_label
-            ))
-        else:
-            fig.add_trace(go.Scatter(
-                x=data.index, y=data[y_col], 
-                mode='lines', 
-                line=dict(color=line_color, width=2.5), 
-                name=y_label
-            ))
+    # Scheduled Baseline Curve (Orange dashed)
+    fig_energy.add_trace(go.Scatter(
+        x=df_live.index, y=df_live['scheduled_hvac_power_kW'],
+        mode='lines', name='Scheduled HVAC (Baseline)',
+        line=dict(color='#ea580c', width=2, dash='dash')
+    ))
+    # Predictive Actual Curve (Blue filled)
+    fig_energy.add_trace(go.Scatter(
+        x=df_live.index, y=df_live['predictive_hvac_power_kW'],
+        mode='lines', name='Predictive HVAC (Actual)',
+        line=dict(color='#0284c7', width=2),
+        fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.1)'
+    ))
     
-    if hlines:
-        for hline in hlines:
-            fig.add_hline(y=hline, line_dash="dash", line_color="#ef4444", opacity=0.7)
-
-    marker_dt = datetime.combine(selected_date, active_time)
-    marker_text = "LIVE" if is_live_mode else "INSPECT"
-    marker_color = "#ef4444" if is_live_mode else "#38bdf8"
-
-    fig.add_vline(
-        x=marker_dt, 
-        line_width=2, 
-        line_dash="solid", 
-        line_color=marker_color, 
-        annotation_text=marker_text, 
-        annotation_position="top right",
-        annotation_font_color=marker_color
+    fig_energy.update_layout(
+        margin=dict(l=20, r=20, t=10, b=20),
+        xaxis_title="", yaxis_title="Power (kW)",
+        plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+        font=dict(color="#475569", size=11),
+        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", range=[datetime.combine(selected_date, time(8, 0)), datetime.combine(selected_date, time(22, 0))]),
+        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", zeroline=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
-
-    fig.update_layout(
-        title=dict(text=title, font=dict(size=16, color="#f1f5f9")),
-        margin=dict(l=20, r=20, t=40, b=20),
-        xaxis_title="", 
-        yaxis_title=y_label,
-        hovermode="x unified",
-        plot_bgcolor="#121e3a", 
-        paper_bgcolor="#121e3a",
-        font=dict(color="#94a3b8"),
-        xaxis=dict(
-            showgrid=True, 
-            gridcolor="#1e325c", 
-            zeroline=False,
-            range=[datetime.combine(selected_date, time.min), datetime.combine(selected_date, time.max)]
-        ),
-        yaxis=dict(showgrid=True, gridcolor="#1e325c", zeroline=False),
-        legend=dict(font=dict(color="#f1f5f9"))
-    )
-    return fig
-
-# --- 9. CHARTS ---
-# Row 1: Temperature Profile
-st.subheader("🌡️ Temperature Profile")
-fig_temp = create_dark_blue_plot(df_live, 'T_pred', "Indoor Temperature Tracking", "Temperature (°C)", "#38bdf8", hlines=[22.8, 25.8])
-fig_temp.add_hrect(
-    y0=22.8, y1=25.8, 
-    line_width=0, 
-    fillcolor="#22c55e", 
-    opacity=0.15, 
-    annotation_text="Comfort Band (22.8 - 25.8°C)", 
-    annotation_position="top left",
-    annotation_font_color="#4ade80"
-)
-st.plotly_chart(fig_temp, use_container_width=True)
-
-# Row 2: Occupancy Realisation vs. Power Draw
-col_c1, col_c2 = st.columns(2)
-
-with col_c1:
-    st.subheader("👥 Occupancy Realisation (15m Ahead)")
-    fig_realisation = go.Figure()
-    
-    if not df_live.empty:
-        # Ground Truth Realised (15 min later)
-        if 'occ_actual_15m' in df_live.columns:
-            fig_realisation.add_trace(go.Scatter(
-                x=df_live.index, 
-                y=df_live['occ_actual_15m'], 
-                mode='lines', 
-                name='Actual Realised (15m Later)',
-                line=dict(color='#4ade80', width=2.5),
-                line_shape='hv'
-            ))
-        
-        # Model 15-minute prediction
-        fig_realisation.add_trace(go.Scatter(
-            x=df_live.index, 
-            y=df_live['occ_pred'], 
-            mode='lines', 
-            name='Model Forecast (15m Ahead)',
-            line=dict(color='#38bdf8', width=2, dash='dot'),
-            line_shape='hv'
-        ))
-        
-        # Current occupancy now
-        fig_realisation.add_trace(go.Scatter(
-            x=df_live.index, 
-            y=df_live['occ_true'], 
-            mode='lines', 
-            name='Occupancy (Now)',
-            line=dict(color='#94a3b8', width=1.5, dash='dash'),
-            line_shape='hv'
-        ))
-
-    marker_dt = datetime.combine(selected_date, active_time)
-    marker_text = "LIVE" if is_live_mode else "INSPECT"
-    marker_color = "#ef4444" if is_live_mode else "#38bdf8"
-    fig_realisation.add_vline(x=marker_dt, line_width=2, line_dash="solid", line_color=marker_color)
-
-    fig_realisation.update_layout(
-        title=dict(text="Forecast vs. Ground Truth Realisation", font=dict(size=16, color="#f1f5f9")),
-        xaxis_title="", yaxis_title="Occupants",
-        hovermode="x unified",
-        margin=dict(l=20, r=20, t=40, b=20),
-        plot_bgcolor="#121e3a", paper_bgcolor="#121e3a",
-        font=dict(color="#94a3b8"),
-        xaxis=dict(
-            showgrid=True, gridcolor="#1e325c", zeroline=False,
-            range=[datetime.combine(selected_date, time.min), datetime.combine(selected_date, time.max)]
-        ),
-        yaxis=dict(showgrid=True, gridcolor="#1e325c", zeroline=False),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="#f1f5f9"))
-    )
-    st.plotly_chart(fig_realisation, use_container_width=True)
-
-with col_c2:
-    st.subheader("⚡ Energy Usage (HVAC Demand)")
-    fig_energy = create_dark_blue_plot(df_live, 'power_pred', "HVAC Power Draw (Demand)", "Power (kW)", "#fb923c", is_area=True)
     st.plotly_chart(fig_energy, use_container_width=True)
+
+# Chart 2: Temperature Trend
+with chart_col2:
+    st.markdown("<div class='card-header-title'>🌡️ Temperature Trend</div>", unsafe_allow_html=True)
+    fig_temp = go.Figure()
+    
+    # Comfort Band Shading
+    fig_temp.add_hrect(
+        y0=22.8, y1=25.8, line_width=0, fillcolor="#22c55e", opacity=0.12,
+        annotation_text="Comfort Range", annotation_position="top right", annotation_font_size=10
+    )
+    # Outdoor Temperature (Orange)
+    fig_temp.add_trace(go.Scatter(
+        x=df_live.index, y=df_live['outdoor_temperature_C'],
+        mode='lines', name='Outdoor Temperature',
+        line=dict(color='#f97316', width=2)
+    ))
+    # Setpoint (Green dashed line)
+    fig_temp.add_hline(y=24.0, line_dash="dash", line_color="#10b981", annotation_text="Setpoint", annotation_position="top left")
+    
+    # Zone Temperature (Blue)
+    fig_temp.add_trace(go.Scatter(
+        x=df_live.index, y=df_live['predictive_room_temperature_C'],
+        mode='lines', name='Zone Temperature',
+        line=dict(color='#0284c7', width=2.5)
+    ))
+
+    fig_temp.update_layout(
+        margin=dict(l=20, r=20, t=10, b=20),
+        xaxis_title="", yaxis_title="Temperature (°C)",
+        plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+        font=dict(color="#475569", size=11),
+        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", range=[datetime.combine(selected_date, time(8, 0)), datetime.combine(selected_date, time(22, 0))]),
+        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", range=[16, 32]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig_temp, use_container_width=True)
+
+st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
+
+# --- 6. BOTTOM ROW: DEVICE STATUS & OCCUPANCY/MODE ---
+bot_col1, bot_col2 = st.columns([1.1, 1.9])
+
+# HVAC Device Status Table
+with bot_col1:
+    st.markdown("<div class='card-header-title'>⚙️ HVAC Device Status</div>", unsafe_allow_html=True)
+    
+    hvac_status_str = "<span class='badge-on'><span class='circle-dot circle-green'></span> ON</span>" if hvac_on else "<span class='badge-off'><span class='circle-dot circle-gray'></span> OFF</span>"
+    cooling_str = "<span class='badge-on'><span class='circle-dot circle-green'></span> ACTIVE</span>" if is_cooling else "<span class='badge-off'><span class='circle-dot circle-gray'></span> IDLE</span>"
+    damper_str = "<span class='badge-on'><span class='circle-dot circle-green'></span> OPEN</span>" if cur_occ > 0 else "<span class='badge-off'><span class='circle-dot circle-gray'></span> MINIMUM</span>"
+    
+    table_html = f"""
+    <div style="background-color: #ffffff; border-radius: 10px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <table class="status-table">
+            <thead>
+                <tr>
+                    <th>Device</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>HVAC Unit</td><td>{hvac_status_str}</td></tr>
+                <tr><td>Supply Fan</td><td>{hvac_status_str}</td></tr>
+                <tr><td>Damper</td><td>{damper_str}</td></tr>
+                <tr><td>Cooling</td><td>{cooling_str}</td></tr>
+                <tr><td>Occupancy Sensor</td><td><span class='badge-on'><span class='circle-dot circle-green'></span> ONLINE</span></td></tr>
+                <tr><td>Temperature Sensor</td><td><span class='badge-on'><span class='circle-dot circle-green'></span> ONLINE</span></td></tr>
+                <tr><td>Outdoor Temp. Sensor</td><td><span class='badge-on'><span class='circle-dot circle-green'></span> ONLINE</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+    """
+    st.markdown(table_html, unsafe_allow_html=True)
+
+# Occupancy & HVAC Mode Chart
+with bot_col2:
+    st.markdown("<div class='card-header-title'>👥 Occupancy & HVAC Mode</div>", unsafe_allow_html=True)
+    fig_occ = go.Figure()
+    
+    # Background HVAC Mode Bars
+    fig_occ.add_trace(go.Bar(
+        x=df_live.index, y=(df_live['predictive_hvac_power_kW'] > 0).astype(int) * 45,
+        name='HVAC Mode (Active)',
+        marker_color='rgba(219, 234, 254, 0.6)',
+        width=1000 * 60 * 4
+    ))
+    
+    # Predicted Occupancy (+15 min) (Orange dashed)
+    fig_occ.add_trace(go.Scatter(
+        x=df_live.index, y=df_live['occupancy_forecast_15min'],
+        mode='lines', name='Predicted Occupancy (+15 min)',
+        line=dict(color='#f97316', width=2, dash='dash')
+    ))
+    
+    # Actual Occupancy (Solid Blue)
+    fig_occ.add_trace(go.Scatter(
+        x=df_live.index, y=df_live['occupancy_now'],
+        mode='lines', name='Actual Occupancy',
+        line=dict(color='#0284c7', width=2.5)
+    ))
+
+    fig_occ.update_layout(
+        margin=dict(l=20, r=20, t=10, b=20),
+        xaxis_title="", yaxis_title="People",
+        plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+        font=dict(color="#475569", size=11),
+        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", range=[datetime.combine(selected_date, time(8, 0)), datetime.combine(selected_date, time(22, 0))]),
+        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", range=[0, 50]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig_occ, use_container_width=True)
