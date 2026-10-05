@@ -56,7 +56,7 @@ st.markdown("""
         border-radius: 18px;
         padding: 22px 24px;
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
-        height: 200px;  /* Sized for TV display */
+        height: 200px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -510,7 +510,7 @@ with chart_col2:
 
 st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
 
-# --- 8. BOTTOM ROW: DEVICE STATUS & OCCUPANCY (NO HVAC MODE BAR) ---
+# --- 8. BOTTOM ROW: DEVICE STATUS & OCCUPANCY (SCALE ADJUSTED TO 0-8) ---
 bot_col1, bot_col2 = st.columns([1.1, 1.9])
 
 with bot_col1:
@@ -549,6 +549,11 @@ with bot_col2:
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>👥 Occupancy Tracking & Prediction</div>", unsafe_allow_html=True)
     fig_occ = go.Figure()
     
+    # Dynamic tight Y-axis range calculation (capped comfortably at 8 or actual max + 2)
+    day_window_data = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
+    max_occ_day = max(day_window_data['occupancy_now'].max(), day_window_data['occupancy_forecast_15min'].max())
+    y_upper = max(8, int(max_occ_day) + 2) if pd.notna(max_occ_day) else 8
+
     # Predicted Occupancy (+15 min) (Orange dashed)
     fig_occ.add_trace(go.Scatter(
         x=df_live.index, y=df_live['occupancy_forecast_15min'],
@@ -572,10 +577,16 @@ with bot_col2:
         plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
         font=dict(color="#334155", size=15),
         xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[t_start, t_end]),
-        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[0, 50]),
+        yaxis=dict(
+            showgrid=True, 
+            gridcolor="#f1f5f9", 
+            tickfont=dict(size=14), 
+            range=[0, y_upper],  # Dynamic tight scale (0 to 8) instead of 0 to 50
+            dtick=1              # Step increments of 1 person for distinct visibility
+        ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
     st.plotly_chart(fig_occ, use_container_width=True)
 
-# Extra spacer to ensure continuous scrolling is active on all screen sizes
+# Bottom spacing to keep the auto-scroll loop smooth on all TV resolutions
 st.markdown("<div style='height: 120px;'></div>", unsafe_allow_html=True)
