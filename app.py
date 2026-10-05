@@ -344,13 +344,27 @@ cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
 is_cooling = cur_power > 0.05
 hvac_on = cur_power > 0.0
 
-# --- RECALCULATE DAILY ENERGY STARTING STRICTLY FROM 08:00 AM ---
-# Energy (kWh) = Sum of Power (kW) * (5 minutes / 60 minutes) for all readings >= 08:00 AM
-df_live_since_8am = df_live[df_live.index >= t_start]
+# --- CUMULATIVE ENERGY RECALCULATION (RESET STRICTLY AT 08:00 AM) ---
+# Calculate 5-minute interval energy: kWh = kW * (5 / 60)
+df_day['pred_energy_step'] = df_day['predictive_hvac_power_kW'] * (5.0 / 60.0)
+df_day['sched_energy_step'] = df_day['scheduled_hvac_power_kW'] * (5.0 / 60.0)
 
+# Calculate cumulative profile from 08:00 AM forward
+day_work_mask = (df_day.index >= t_start)
+df_day['pred_energy_cum_day'] = 0.0
+df_day['sched_energy_cum_day'] = 0.0
+df_day.loc[day_work_mask, 'pred_energy_cum_day'] = df_day.loc[day_work_mask, 'pred_energy_step'].cumsum()
+df_day.loc[day_work_mask, 'sched_energy_cum_day'] = df_day.loc[day_work_mask, 'sched_energy_step'].cumsum()
+
+# Re-slice df_live with cumulative energy columns
+df_live = df_day[df_day.index.time <= active_time]
+if df_live.empty:
+    df_live = df_day.iloc[:1]
+
+df_live_since_8am = df_live[df_live.index >= t_start]
 if not df_live_since_8am.empty:
-    pred_energy_today = (df_live_since_8am['predictive_hvac_power_kW'] * (5.0 / 60.0)).sum()
-    sched_energy_today = (df_live_since_8am['scheduled_hvac_power_kW'] * (5.0 / 60.0)).sum()
+    pred_energy_today = df_live_since_8am['pred_energy_cum_day'].iloc[-1]
+    sched_energy_today = df_live_since_8am['sched_energy_cum_day'].iloc[-1]
 else:
     pred_energy_today = 0.0
     sched_energy_today = 0.0
@@ -358,7 +372,7 @@ else:
 energy_saved = max(0.0, sched_energy_today - pred_energy_today)
 pct_saved = (energy_saved / sched_energy_today * 100) if sched_energy_today > 0 else 0.0
 
-# --- 6. TOP 4 KPI CARDS (CLEAN & ACCENTUATED) ---
+# --- 6. TOP 4 KPI CARDS ---
 kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1.1, 1.3, 1.1, 1.5])
 
 # Box 1: Occupancy
@@ -427,11 +441,11 @@ with kpi_col3:
     </div>
     """, unsafe_allow_html=True)
 
-# Box 4: Energy Usage (Today from 08:00 AM)
+# Box 4: Energy Usage (Cumulative since 08:00 AM)
 with kpi_col4:
     st.markdown(f"""
     <div class="metric-card-box">
-        <div class="card-top-title">⚡ Energy Usage (Since 08:00 AM)</div>
+        <div class="card-top-title">⚡ Cumulative Energy (Since 08:00 AM)</div>
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin: auto 0;">
             <div>
                 <div class="metric-label-muted">Predictive HVAC</div>
@@ -444,46 +458,65 @@ with kpi_col4:
         </div>
         <div style="display: flex; align-items: center; gap: 8px; color: #15803d; font-size: 18px; font-weight: 900; border-top: 1.5px solid #f1f5f9; padding-top: 8px;">
             <span>🍃</span>
-            <span>{energy_saved:.2f} kWh ({pct_saved:.1f}%) Energy Saved</span>
+            <span>{energy_saved:.2f} kWh ({pct_saved:.1f}%) Cumulative Saving</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
 
-# --- 7. MID-ROW: ENERGY CONSUMPTION & HIGH-VISIBILITY TEMPERATURE TREND ---
+# --- 7. MID-ROW: CUMULATIVE ENERGY GRAPH & TEMPERATURE TREND ---
 chart_col1, chart_col2 = st.columns(2)
 
+# Chart 1: Cumulative Energy Consumption
 with chart_col1:
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Energy Consumption (08:00 - 18:00)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Cumulative Energy Consumption (kWh, Since 08:00)</div>", unsafe_allow_html=True)
     fig_energy = go.Figure()
     
+    # Filter working hours for plotting
+    df_live_plot = df_live[df_live.index >= t_start]
+    
+    # Scheduled Baseline Cumulative (Orange dashed)
     fig_energy.add_trace(go.Scatter(
-        x=df_live.index, y=df_live['scheduled_hvac_power_kW'],
-        mode='lines', name='Scheduled HVAC (Baseline)',
+        x=df_live_plot.index, y=df_live_plot['sched_energy_cum_day'],
+        mode='lines', name='Scheduled Baseline (Cum. kWh)',
         line=dict(color='#ea580c', width=3.5, dash='dash')
     ))
+    
+    # Predictive Actual Cumulative (Blue solid with fill)
     fig_energy.add_trace(go.Scatter(
-        x=df_live.index, y=df_live['predictive_hvac_power_kW'],
-        mode='lines', name='Predictive HVAC (Actual)',
+        x=df_live_plot.index, y=df_live_plot['pred_energy_cum_day'],
+        mode='lines', name='Predictive HVAC (Cum. kWh)',
         line=dict(color='#0284c7', width=4),
         fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.12)'
     ))
     
     fig_energy.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
     
+    # Calculate tight y-axis range based on max energy
+    day_work_window = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
+    max_cum_e = day_work_window['sched_energy_cum_day'].max() if not day_work_window.empty else 5.0
+    y_energy_upper = max(2.0, round(float(max_cum_e) + 0.5, 1))
+
     fig_energy.update_layout(
         height=400,
         margin=dict(l=25, r=25, t=10, b=25),
-        xaxis_title="", yaxis_title="Power (kW)",
+        xaxis_title="", yaxis_title="Cumulative Energy (kWh)",
         plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
         font=dict(color="#334155", size=15),
         xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[t_start, t_end]),
-        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), zeroline=False),
+        yaxis=dict(
+            showgrid=True, 
+            gridcolor="#f1f5f9", 
+            tickfont=dict(size=14), 
+            range=[0.0, y_energy_upper],
+            zeroline=False
+        ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
     st.plotly_chart(fig_energy, use_container_width=True)
 
+# Chart 2: High-Visibility Temperature Trend
 with chart_col2:
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend (Clear Movement Scale)</div>", unsafe_allow_html=True)
     fig_temp = go.Figure()
@@ -500,14 +533,14 @@ with chart_col2:
         annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=13
     )
     
-    # Zone Temperature (Primary focus line: clearly displays peaks and troughs)
+    # Zone Temperature
     fig_temp.add_trace(go.Scatter(
         x=df_live.index, y=df_live['predictive_room_temperature_C'],
         mode='lines', name='Zone Temperature',
         line=dict(color='#0284c7', width=4)
     ))
     
-    # Outdoor Temperature on secondary y-axis to prevent flattening the room temperature
+    # Outdoor Temperature on secondary y-axis to prevent squashing zone temperature
     fig_temp.add_trace(go.Scatter(
         x=df_live.index, y=df_live['outdoor_temperature_C'],
         mode='lines', name='Outdoor Temp (Ref)',
@@ -517,7 +550,7 @@ with chart_col2:
     
     fig_temp.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
 
-    # Dynamic tight scale that magnifies thermal oscillations clearly
+    # Dynamic tight scale to show thermal movement clearly
     day_window_data = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
     if not day_window_data.empty:
         t_min = float(day_window_data['predictive_room_temperature_C'].min())
@@ -539,8 +572,8 @@ with chart_col2:
             showgrid=True, 
             gridcolor="#f1f5f9", 
             tickfont=dict(size=14), 
-            range=[y_temp_min, y_temp_max],  # Amplified range (e.g. ~24.0°C - 27.2°C)
-            dtick=0.5                        # 0.5°C fine increments
+            range=[y_temp_min, y_temp_max],
+            dtick=0.5
         ),
         yaxis2=dict(
             title="Outdoor (°C)",
