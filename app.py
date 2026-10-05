@@ -323,28 +323,42 @@ else:
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Filter dataset to selected date and time
+# Locked working timeframe: 08:00 AM to 06:00 PM (18:00)
+t_start = datetime.combine(selected_date, time(8, 0))
+t_end = datetime.combine(selected_date, time(18, 0))
+
+# Filter dataset to selected date and active time
 df_day = df_full[df_full.index.date == selected_date].copy()
 df_live = df_day[df_day.index.time <= active_time]
 if df_live.empty:
     df_live = df_day.iloc[:1]
 
+# Current Telemetry Values
 cur_occ = int(df_live['occupancy_now'].iloc[-1])
 pred_occ = int(df_live['occupancy_forecast_15min'].iloc[-1])
 zone_temp = df_live['predictive_room_temperature_C'].iloc[-1]
 outdoor_temp = df_live['outdoor_temperature_C'].iloc[-1]
 setpoint_temp = 24.0
 
-pred_energy_total = df_live['predictive_energy_cumulative_kWh'].iloc[-1]
-sched_energy_total = df_live['scheduled_energy_cumulative_kWh'].iloc[-1]
-energy_saved = max(0.0, sched_energy_total - pred_energy_total)
-pct_saved = (energy_saved / sched_energy_total * 100) if sched_energy_total > 0 else 0.0
-
 cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
 is_cooling = cur_power > 0.05
 hvac_on = cur_power > 0.0
 
-# --- 6. TOP 4 KPI CARDS ---
+# --- RECALCULATE DAILY ENERGY STARTING STRICTLY FROM 08:00 AM ---
+# Energy (kWh) = Sum of Power (kW) * (5 minutes / 60 minutes) for all readings >= 08:00 AM
+df_live_since_8am = df_live[df_live.index >= t_start]
+
+if not df_live_since_8am.empty:
+    pred_energy_today = (df_live_since_8am['predictive_hvac_power_kW'] * (5.0 / 60.0)).sum()
+    sched_energy_today = (df_live_since_8am['scheduled_hvac_power_kW'] * (5.0 / 60.0)).sum()
+else:
+    pred_energy_today = 0.0
+    sched_energy_today = 0.0
+
+energy_saved = max(0.0, sched_energy_today - pred_energy_today)
+pct_saved = (energy_saved / sched_energy_today * 100) if sched_energy_today > 0 else 0.0
+
+# --- 6. TOP 4 KPI CARDS (CLEAN & ACCENTUATED) ---
 kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1.1, 1.3, 1.1, 1.5])
 
 # Box 1: Occupancy
@@ -413,19 +427,19 @@ with kpi_col3:
     </div>
     """, unsafe_allow_html=True)
 
-# Box 4: Energy Usage (Today)
+# Box 4: Energy Usage (Today from 08:00 AM)
 with kpi_col4:
     st.markdown(f"""
     <div class="metric-card-box">
-        <div class="card-top-title">⚡ Energy Usage (Today)</div>
+        <div class="card-top-title">⚡ Energy Usage (Since 08:00 AM)</div>
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin: auto 0;">
             <div>
                 <div class="metric-label-muted">Predictive HVAC</div>
-                <div class="metric-main-val" style="font-size: 38px; color: #2563eb;">{pred_energy_total:.2f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span></div>
+                <div class="metric-main-val" style="font-size: 38px; color: #2563eb;">{pred_energy_today:.2f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span></div>
             </div>
             <div style="text-align: right;">
                 <div class="metric-label-muted">Scheduled Baseline</div>
-                <div class="metric-main-val" style="font-size: 38px; color: #d97706;">{sched_energy_total:.2f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span></div>
+                <div class="metric-main-val" style="font-size: 38px; color: #d97706;">{sched_energy_today:.2f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span></div>
             </div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px; color: #15803d; font-size: 18px; font-weight: 900; border-top: 1.5px solid #f1f5f9; padding-top: 8px;">
@@ -437,15 +451,11 @@ with kpi_col4:
 
 st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
 
-# Locked timeframe: 08:00 AM to 06:00 PM (18:00)
-t_start = datetime.combine(selected_date, time(8, 0))
-t_end = datetime.combine(selected_date, time(18, 0))
-
-# --- 7. MID-ROW: ENERGY CONSUMPTION & TEMPERATURE TREND ---
+# --- 7. MID-ROW: ENERGY CONSUMPTION & HIGH-VISIBILITY TEMPERATURE TREND ---
 chart_col1, chart_col2 = st.columns(2)
 
 with chart_col1:
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Energy Consumption</div>", unsafe_allow_html=True)
+    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Energy Consumption (08:00 - 18:00)</div>", unsafe_allow_html=True)
     fig_energy = go.Figure()
     
     fig_energy.add_trace(go.Scatter(
@@ -475,7 +485,7 @@ with chart_col1:
     st.plotly_chart(fig_energy, use_container_width=True)
 
 with chart_col2:
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend</div>", unsafe_allow_html=True)
+    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend (Clear Movement Scale)</div>", unsafe_allow_html=True)
     fig_temp = go.Figure()
     
     # Comfort Band Shading (22.8 - 25.8°C)
@@ -484,20 +494,20 @@ with chart_col2:
         annotation_text="Comfort Range (22.8 - 25.8°C)", annotation_position="top right", annotation_font_size=13
     )
     
-    # Setpoint line at 24.0°C
+    # Setpoint (24.0°C)
     fig_temp.add_hline(
         y=24.0, line_dash="dash", line_color="#10b981", line_width=2.5, 
         annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=13
     )
     
-    # Zone Temperature (Primary focus line, high visibility)
+    # Zone Temperature (Primary focus line: clearly displays peaks and troughs)
     fig_temp.add_trace(go.Scatter(
         x=df_live.index, y=df_live['predictive_room_temperature_C'],
         mode='lines', name='Zone Temperature',
         line=dict(color='#0284c7', width=4)
     ))
     
-    # Outdoor Temperature placed on secondary y-axis to prevent compressing zone temperature
+    # Outdoor Temperature on secondary y-axis to prevent flattening the room temperature
     fig_temp.add_trace(go.Scatter(
         x=df_live.index, y=df_live['outdoor_temperature_C'],
         mode='lines', name='Outdoor Temp (Ref)',
@@ -507,7 +517,16 @@ with chart_col2:
     
     fig_temp.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
 
-    # Ultra-compact 3°C scale: 23.5°C to 26.5°C with 0.5°C steps
+    # Dynamic tight scale that magnifies thermal oscillations clearly
+    day_window_data = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
+    if not day_window_data.empty:
+        t_min = float(day_window_data['predictive_room_temperature_C'].min())
+        t_max = float(day_window_data['predictive_room_temperature_C'].max())
+        y_temp_min = round(min(23.8, t_min - 0.2), 1)
+        y_temp_max = round(max(26.2, t_max + 0.2), 1)
+    else:
+        y_temp_min, y_temp_max = 23.8, 26.5
+
     fig_temp.update_layout(
         height=400,
         margin=dict(l=25, r=25, t=10, b=25),
@@ -520,8 +539,8 @@ with chart_col2:
             showgrid=True, 
             gridcolor="#f1f5f9", 
             tickfont=dict(size=14), 
-            range=[23.5, 26.5],  # Tight 3-degree view
-            dtick=0.5            # 0.5°C increments
+            range=[y_temp_min, y_temp_max],  # Amplified range (e.g. ~24.0°C - 27.2°C)
+            dtick=0.5                        # 0.5°C fine increments
         ),
         yaxis2=dict(
             title="Outdoor (°C)",
@@ -529,7 +548,7 @@ with chart_col2:
             side='right',
             showgrid=False,
             tickfont=dict(size=12, color='#f97316'),
-            range=[15.0, 35.0]
+            range=[15.0, 36.0]
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
@@ -576,7 +595,7 @@ with bot_col2:
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>👥 Occupancy Tracking & Prediction</div>", unsafe_allow_html=True)
     fig_occ = go.Figure()
     
-    day_window_data = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
+    # Calculate tight upper bound for people headcount
     max_occ_day = max(day_window_data['occupancy_now'].max(), day_window_data['occupancy_forecast_15min'].max())
     y_upper = max(8, int(max_occ_day) + 2) if pd.notna(max_occ_day) else 8
 
