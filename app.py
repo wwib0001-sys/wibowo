@@ -242,7 +242,7 @@ components.html("""
 </script>
 """, height=0, width=0)
 
-# --- 3. DATA LOADING ---
+# --- 3. DATA LOADING & DYNAMIC CLOCK SYNC ---
 @st.cache_data(ttl=60)
 def load_data():
     try:
@@ -275,19 +275,21 @@ def load_data():
 df_full = load_data()
 available_dates = df_full.index.normalize().unique().date
 
-sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
-default_date = sep29_dates[0] if sep29_dates else available_dates[-1]
-
-# Real-time Melbourne Clock
+# Active Live Melbourne Clock (AEDT/AEST)
 try:
     import pytz
     melbourne_tz = pytz.timezone('Australia/Melbourne')
     now_melbourne = datetime.now(melbourne_tz)
 except Exception:
-    melbourne_tz = timezone(timedelta(hours=10))
+    melbourne_tz = timezone(timedelta(hours=11))
     now_melbourne = datetime.now(melbourne_tz)
 
+real_live_date = now_melbourne.date()
 real_live_time = now_melbourne.time()
+
+# Dataset benchmark fallback: If live date is outside CSV range, map to benchmark date
+sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
+benchmark_date = sep29_dates[0] if sep29_dates else available_dates[-1]
 
 # --- 4. TOP HEADER BAR ---
 col_head_left, col_head_mid, col_head_right = st.columns([2.5, 1.3, 1.0])
@@ -304,8 +306,8 @@ with col_head_mid:
     st.markdown(f"""
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 24px; margin-top: 6px;">
             <div style="text-align: right; line-height: 1.2;">
-                <div style="font-size: 16px; color: #64748b; font-weight: 800;">📅 {default_date.strftime('%a, %d %b %Y')}</div>
-                <div style="font-size: 28px; font-weight: 900; color: #0f172a;">{real_live_time.strftime('%H:%M:%S')}</div>
+                <div style="font-size: 16px; color: #64748b; font-weight: 800;">📅 {now_melbourne.strftime('%a, %d %b %Y')}</div>
+                <div style="font-size: 28px; font-weight: 900; color: #0f172a;">{now_melbourne.strftime('%H:%M:%S')}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span class="circle-dot circle-green"></span>
@@ -328,20 +330,22 @@ with c_mode:
     is_live_mode = st.toggle("🔴 Real-Time Clock Sync", value=True, help="Toggle OFF to search and jump to any historical date/time.")
 
 if is_live_mode:
-    selected_date = default_date
+    display_date_str = now_melbourne.strftime('%a, %d %b %Y')
+    active_date = benchmark_date
     active_time = real_live_time
     with c_date:
-        st.markdown(f"<div style='font-size: 17px; font-weight: 800; padding-top: 6px; color: #334155;'>📅 Active Date: <b>{selected_date.strftime('%Y-%m-%d')}</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='font-size: 17px; font-weight: 800; padding-top: 6px; color: #334155;'>📅 Live Date: <b>{display_date_str}</b></div>", unsafe_allow_html=True)
     with c_time:
-        st.markdown(f"<div style='font-size: 17px; font-weight: 800; padding-top: 6px; color: #2563eb;'>⏱️ Real-Time Tracking: <b>{active_time.strftime('%H:%M:%S')} (AEST)</b></div>", unsafe_allow_html=True)
+        tz_abbr = now_melbourne.strftime('%Z') or "AEDT"
+        st.markdown(f"<div style='font-size: 17px; font-weight: 800; padding-top: 6px; color: #2563eb;'>⏱️ Real-Time Tracking: <b>{active_time.strftime('%H:%M:%S')} ({tz_abbr})</b></div>", unsafe_allow_html=True)
 else:
     with c_date:
-        date_options = [d.strftime('%Y-%m-%d') for d in available_dates]
-        default_idx = date_options.index(default_date.strftime('%Y-%m-%d')) if default_date.strftime('%Y-%m-%d') in date_options else len(date_options)-1
+        date_options = [d.strftime('%a, %d %b %Y') for d in available_dates]
+        default_idx = [d.strftime('%Y-%m-%d') for d in available_dates].index(benchmark_date.strftime('%Y-%m-%d')) if benchmark_date.strftime('%Y-%m-%d') in [d.strftime('%Y-%m-%d') for d in available_dates] else len(date_options)-1
         sel_date_str = st.selectbox("🔍 Search Date:", options=date_options, index=default_idx)
-        selected_date = datetime.strptime(sel_date_str, '%Y-%m-%d').date()
+        active_date = datetime.strptime(sel_date_str, '%a, %d %b %Y').date()
 
-    df_day_candidates = df_full[df_full.index.date == selected_date]
+    df_day_candidates = df_full[df_full.index.date == active_date]
     day_times = [t.strftime('%H:%M') for t in df_day_candidates.index.time]
 
     with c_time:
@@ -355,11 +359,11 @@ else:
 st.markdown("</div>", unsafe_allow_html=True)
 
 # Locked working timeframe: 08:00 AM to 06:00 PM (18:00)
-t_start = datetime.combine(selected_date, time(8, 0))
-t_end = datetime.combine(selected_date, time(18, 0))
+t_start = datetime.combine(active_date, time(8, 0))
+t_end = datetime.combine(active_date, time(18, 0))
 
 # Filter dataset to selected date and active time
-df_day = df_full[df_full.index.date == selected_date].copy()
+df_day = df_full[df_full.index.date == active_date].copy()
 df_live = df_day[df_day.index.time <= active_time]
 if df_live.empty:
     df_live = df_day.iloc[:1]
@@ -375,15 +379,16 @@ cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
 is_cooling = cur_power > 0.05
 hvac_on = cur_power > 0.0
 
-# --- CUMULATIVE ENERGY RECALCULATION (RESET AT 08:00 AM) ---
-df_day['pred_energy_step'] = df_day['predictive_hvac_power_kW'] * (5.0 / 60.0)
-df_day['sched_energy_step'] = df_day['scheduled_hvac_power_kW'] * (5.0 / 60.0)
+# --- ENERGY CALCULATIONS (INTERVAL STEP KWH & CUMULATIVE KWH FROM 08:00 AM) ---
+# Interval non-cumulative energy per 5-min step: kWh = Power (kW) * (5 / 60)
+df_day['pred_kwh_interval'] = df_day['predictive_hvac_power_kW'] * (5.0 / 60.0)
+df_day['sched_kwh_interval'] = df_day['scheduled_hvac_power_kW'] * (5.0 / 60.0)
 
 day_work_mask = (df_day.index >= t_start)
 df_day['pred_energy_cum_day'] = 0.0
 df_day['sched_energy_cum_day'] = 0.0
-df_day.loc[day_work_mask, 'pred_energy_cum_day'] = df_day.loc[day_work_mask, 'pred_energy_step'].cumsum()
-df_day.loc[day_work_mask, 'sched_energy_cum_day'] = df_day.loc[day_work_mask, 'sched_energy_step'].cumsum()
+df_day.loc[day_work_mask, 'pred_energy_cum_day'] = df_day.loc[day_work_mask, 'pred_kwh_interval'].cumsum()
+df_day.loc[day_work_mask, 'sched_energy_cum_day'] = df_day.loc[day_work_mask, 'sched_kwh_interval'].cumsum()
 
 df_live = df_day[df_day.index.time <= active_time]
 if df_live.empty:
@@ -404,12 +409,9 @@ gauge_pct = min(100.0, max(0.0, pct_saved))
 gauge_deg = int((gauge_pct / 100.0) * 360)
 
 # --- 6. TOP SUMMARY CARDS (ALIGNED EXACTLY WITH THEIR GRAPHS BELOW) ---
-# Column 1 aligns with: Occupancy & Temperature / Climate Control
-# Column 2 aligns with: Energy Usage & Power Grid
 col_top_left, col_top_right = st.columns([1.0, 1.0])
 
 with col_top_left:
-    # Sub-columns for Occupancy and Temperature
     sub_col1, sub_col2, sub_col3 = st.columns([1.1, 1.2, 0.9])
     
     # 1. Occupancy Card
@@ -479,7 +481,7 @@ with col_top_left:
         """, unsafe_allow_html=True)
 
 with col_top_right:
-    # Energy Usage Card (Full Width in Right Column, Perfectly Aligned over Energy Chart)
+    # Energy Usage Card (Full Width in Right Column, Aligned over Energy Chart)
     st.markdown(f"""
     <div class="metric-card-box">
         <div class="card-top-title">⚡ Energy Usage Summary (Since 08:00 AM)</div>
@@ -513,7 +515,6 @@ grid_left, grid_right = st.columns([1.0, 1.0])
 
 # --- LEFT COLUMN: OCCUPANCY & TEMPERATURE GRAPHS ---
 with grid_left:
-    # Graph 1: Occupancy Tracking & 15 Minute Ahead Forecast
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>👥 Occupancy Tracking & 15 Minute Ahead Forecast</div>", unsafe_allow_html=True)
     
     day_window_data = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
@@ -531,7 +532,7 @@ with grid_left:
         mode='lines', name='Actual Occupancy',
         line=dict(color='#0284c7', width=4.5)
     ))
-    fig_occ.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
+    fig_occ.add_vline(x=datetime.combine(active_date, active_time), line_width=2.5, line_color="#ef4444")
 
     fig_occ.update_layout(
         height=380,
@@ -547,7 +548,6 @@ with grid_left:
     
     st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
 
-    # Graph 2: Temperature Trend Graph
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend (Clear Movement Scale)</div>", unsafe_allow_html=True)
     fig_temp = go.Figure()
     
@@ -570,7 +570,7 @@ with grid_left:
         line=dict(color='#f97316', width=2.5, dash='dot'),
         yaxis='y2'
     ))
-    fig_temp.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
+    fig_temp.add_vline(x=datetime.combine(active_date, active_time), line_width=2.5, line_color="#ef4444")
 
     if not day_window_data.empty:
         t_min = float(day_window_data['predictive_room_temperature_C'].min())
@@ -607,44 +607,80 @@ with grid_left:
     )
     st.plotly_chart(fig_temp, use_container_width=True)
 
-# --- RIGHT COLUMN: ENERGY GRAPH & DEVICE STATUS ---
+# --- RIGHT COLUMN: UNIFIED CUMULATIVE & NON-CUMULATIVE ENERGY GRAPH + DEVICE STATUS ---
 with grid_right:
-    # Graph 3: Cumulative Energy Consumption Graph (Directly under Energy Summary Card)
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Cumulative Energy Consumption (kWh, Since 08:00)</div>", unsafe_allow_html=True)
+    # Unified Energy Consumption Graph: Non-Cumulative (Primary Y1, kW / 5-min step) & Cumulative (Secondary Y2, kWh)
+    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Energy Profile: Power Draw & Cumulative Energy (kWh)</div>", unsafe_allow_html=True)
     fig_energy = go.Figure()
     
     df_live_plot = df_live[df_live.index >= t_start]
+    
+    # 1. Non-Cumulative Power Demand (Left Y-Axis, kW)
+    fig_energy.add_trace(go.Scatter(
+        x=df_live_plot.index, y=df_live_plot['scheduled_hvac_power_kW'],
+        mode='lines', name='Baseline Power (kW)',
+        line=dict(color='#fdba74', width=2, dash='dot'),
+        yaxis='y'
+    ))
+    fig_energy.add_trace(go.Scatter(
+        x=df_live_plot.index, y=df_live_plot['predictive_hvac_power_kW'],
+        mode='lines', name='Predictive Power (kW)',
+        line=dict(color='#7dd3fc', width=2.5),
+        fill='tozeroy', fillcolor='rgba(125, 211, 252, 0.15)',
+        yaxis='y'
+    ))
+    
+    # 2. Cumulative Energy Consumed Since 08:00 AM (Right Y-Axis, kWh)
     fig_energy.add_trace(go.Scatter(
         x=df_live_plot.index, y=df_live_plot['sched_energy_cum_day'],
-        mode='lines', name='Scheduled Baseline (Cum. kWh)',
-        line=dict(color='#ea580c', width=3.5, dash='dash')
+        mode='lines', name='Baseline Cumulative (kWh)',
+        line=dict(color='#ea580c', width=3.5, dash='dash'),
+        yaxis='y2'
     ))
     fig_energy.add_trace(go.Scatter(
         x=df_live_plot.index, y=df_live_plot['pred_energy_cum_day'],
-        mode='lines', name='Predictive HVAC (Cum. kWh)',
+        mode='lines', name='Predictive Cumulative (kWh)',
         line=dict(color='#0284c7', width=4),
-        fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.12)'
+        yaxis='y2'
     ))
-    fig_energy.add_vline(x=datetime.combine(selected_date, active_time), line_width=2.5, line_color="#ef4444")
     
+    fig_energy.add_vline(x=datetime.combine(active_date, active_time), line_width=2.5, line_color="#ef4444")
+    
+    # Dynamic ranges
     max_cum_e = day_window_data['sched_energy_cum_day'].max() if not day_window_data.empty else 5.0
-    y_energy_upper = max(2.0, round(float(max_cum_e) + 0.5, 1))
+    y_energy_cum_upper = max(2.0, round(float(max_cum_e) + 0.6, 1))
 
     fig_energy.update_layout(
         height=380,
         margin=dict(l=25, r=25, t=10, b=25),
-        xaxis_title="", yaxis_title="Cumulative Energy (kWh)",
+        xaxis_title="", 
         plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-        font=dict(color="#334155", size=15),
-        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[t_start, t_end]),
-        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[0.0, y_energy_upper], zeroline=False),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
+        font=dict(color="#334155", size=14),
+        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[t_start, t_end]),
+        yaxis=dict(
+            title="Power Demand (kW)",
+            showgrid=True, 
+            gridcolor="#f1f5f9", 
+            tickfont=dict(size=13, color='#0284c7'),
+            range=[0.0, 2.2],
+            zeroline=False
+        ),
+        yaxis2=dict(
+            title="Cumulative Energy (kWh)",
+            overlaying='y',
+            side='right',
+            showgrid=False,
+            tickfont=dict(size=13, color='#ea580c'),
+            range=[0.0, y_energy_cum_upper],
+            zeroline=False
+        ),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=12))
     )
     st.plotly_chart(fig_energy, use_container_width=True)
     
     st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
 
-    # Device Status Table (Directly underneath Energy)
+    # Device Status Table
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>⚙️ HVAC Device & Sensor Infrastructure Status</div>", unsafe_allow_html=True)
     
     hvac_status_str = "<span class='badge-on'><span class='circle-dot circle-green'></span> ON</span>" if hvac_on else "<span class='badge-off'><span class='circle-dot circle-gray'></span> OFF</span>"
