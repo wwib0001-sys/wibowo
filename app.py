@@ -276,7 +276,6 @@ df_full = load_data()
 available_dates = df_full.index.normalize().unique().date
 
 # Select default date based on CSV data (2025)
-# Prioritize September 29, 2025 if present, otherwise latest date in CSV
 sep29_candidates = [d for d in available_dates if d.year == 2025 and d.month == 9 and d.day == 29]
 csv_default_date = sep29_candidates[0] if sep29_candidates else available_dates[-1]
 
@@ -291,8 +290,7 @@ except Exception:
 
 real_live_time = now_melbourne.time()
 
-# --- 4. TOP HEADER BAR (SYNCHRONIZED WITH CSV DATE & YEAR) ---
-# Date selection state initialization
+# --- 4. TOP HEADER BAR ---
 if 'active_date' not in st.session_state:
     st.session_state.active_date = csv_default_date
 
@@ -339,7 +337,6 @@ if is_live_mode:
     st.session_state.active_date = active_date
     active_time = real_live_time
     with c_date:
-        # Date & Year based directly on the dataset (e.g. Mon, 29 Sep 2025)
         st.markdown(f"<div style='font-size: 17px; font-weight: 800; padding-top: 6px; color: #334155;'>📅 Active CSV Date: <b>{active_date.strftime('%a, %d %b %Y')}</b></div>", unsafe_allow_html=True)
     with c_time:
         tz_abbr = now_melbourne.strftime('%Z') or "AEDT"
@@ -387,7 +384,7 @@ cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
 is_cooling = cur_power > 0.05
 hvac_on = cur_power > 0.0
 
-# --- ENERGY CALCULATIONS (INTERVAL STEP KWH & CUMULATIVE KWH FROM 08:00 AM) ---
+# --- ENERGY CALCULATIONS (FROM 08:00 AM) ---
 df_day['pred_kwh_interval'] = df_day['predictive_hvac_power_kW'] * (5.0 / 60.0)
 df_day['sched_kwh_interval'] = df_day['scheduled_hvac_power_kW'] * (5.0 / 60.0)
 
@@ -415,16 +412,24 @@ pct_saved = (energy_saved / sched_energy_today * 100) if sched_energy_today > 0 
 gauge_pct = min(100.0, max(0.0, pct_saved))
 gauge_deg = int((gauge_pct / 100.0) * 360)
 
-# --- 6. TOP SUMMARY CARDS (ALIGNED EXACTLY WITH THEIR GRAPHS BELOW) ---
+# --- 6. TOP SUMMARY CARDS ---
 col_top_left, col_top_right = st.columns([1.0, 1.0])
 
 with col_top_left:
     sub_col1, sub_col2, sub_col3 = st.columns([1.1, 1.2, 0.9])
     
-    # 1. Occupancy Card
+    # 1. Occupancy Card with Equal Blue Condition
+    if pred_occ > cur_occ:
+        trend_symbol = "↑"
+        trend_color = "#dc2626"  # Red for rise
+    elif pred_occ < cur_occ:
+        trend_symbol = "↓"
+        trend_color = "#16a34a"  # Green for drop
+    else:
+        trend_symbol = "="
+        trend_color = "#2563eb"  # Blue for equal
+
     with sub_col1:
-        arrow = "↑" if pred_occ >= cur_occ else "↓"
-        arrow_color = "#dc2626" if pred_occ >= cur_occ else "#16a34a"
         st.markdown(f"""
         <div class="metric-card-box">
             <div class="card-top-title">👥 Occupancy</div>
@@ -437,7 +442,12 @@ with col_top_left:
                 <div style="border-left: 2px solid #e2e8f0; height: 68px;"></div>
                 <div>
                     <div class="metric-label-muted">15 min ahead</div>
-                    <div class="metric-main-val">{pred_occ} <span style="font-size: 32px; color: {arrow_color};">{arrow}</span></div>
+                    <div class="metric-main-val">
+                        {pred_occ} 
+                        <span style="font-size: 30px; font-weight: 900; color: {trend_color}; vertical-align: middle;">
+                            {trend_symbol}
+                        </span>
+                    </div>
                     <div class="metric-sub-unit">people</div>
                 </div>
             </div>
