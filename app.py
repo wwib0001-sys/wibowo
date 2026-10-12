@@ -338,7 +338,6 @@ with c_mode:
 if is_live_mode:
     active_date = csv_default_date
     st.session_state.active_date = active_date
-    # Clamp live time to the 08:00 - 18:00 window
     if real_live_time < time(8, 0):
         active_time = time(8, 0)
     elif real_live_time > time(18, 0):
@@ -360,7 +359,6 @@ else:
         active_date = datetime.strptime(sel_date_str, '%a, %d %b %Y').date()
         st.session_state.active_date = active_date
 
-    # Filter available day times strictly between 08:00 AM (08:00) and 06:00 PM (18:00)
     df_day_candidates = df_full[df_full.index.date == active_date]
     day_times = [
         t.strftime('%H:%M') 
@@ -538,27 +536,29 @@ with kpi_col4:
     </div>
     """, unsafe_allow_html=True)
 
-# 5. Standalone Energy Usage Summary Card with Bigger Radial Gauge
+# 5. Energy Usage Summary Card with Predictive HVAC & Baseline SIDE BY SIDE
 with kpi_col5:
     st.markdown(f"""
     <div class="metric-card-box">
-        <div class="card-top-title">📊 Daily Energy Usage (Since 08:00 AM)</div>
+        <div class="card-top-title">📊 Energy Usage (Since 08:00 AM)</div>
         <div class="gauge-container" style="padding: 0 4px;">
-            <div style="display: flex; flex-direction: column; justify-content: center; gap: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-around; flex: 1; text-align: center; gap: 14px;">
                 <div>
-                    <div class="metric-label-muted" style="font-size: 12px;">Predictive HVAC</div>
-                    <div style="font-size: 26px; font-weight: 900; color: #2563eb; line-height: 1.0;">
-                        {pred_energy_today:.2f} <span style="font-size: 13px; font-weight: 700; color: #64748b;">kWh</span>
+                    <div class="metric-label-muted" style="font-size: 11.5px;">Predictive HVAC</div>
+                    <div style="font-size: 28px; font-weight: 900; color: #2563eb; line-height: 1.1; margin-top: 4px;">
+                        {pred_energy_today:.2f}
                     </div>
+                    <div class="metric-sub-unit" style="font-size: 12px;">kWh</div>
                 </div>
-                <div style="border-top: 1.5px solid #f1f5f9; padding-top: 6px;">
-                    <div class="metric-label-muted" style="font-size: 12px;">Scheduled Baseline</div>
-                    <div style="font-size: 26px; font-weight: 900; color: #d97706; line-height: 1.0;">
-                        {sched_energy_today:.2f} <span style="font-size: 13px; font-weight: 700; color: #64748b;">kWh</span>
+                <div style="border-left: 2px solid #e2e8f0; height: 58px;"></div>
+                <div>
+                    <div class="metric-label-muted" style="font-size: 11.5px;">Scheduled Baseline</div>
+                    <div style="font-size: 28px; font-weight: 900; color: #d97706; line-height: 1.1; margin-top: 4px;">
+                        {sched_energy_today:.2f}
                     </div>
+                    <div class="metric-sub-unit" style="font-size: 12px;">kWh</div>
                 </div>
             </div>
-            <!-- Enlarged Circular Radial Progress Ring Gauge -->
             <div class="circular-gauge" style="background: conic-gradient(#16a34a 0deg {gauge_deg}deg, #e2e8f0 {gauge_deg}deg 360deg);">
                 <div class="circular-gauge-inner">
                     <div style="font-size: 11px; font-weight: 900; color: #16a34a; text-transform: uppercase; letter-spacing: 0.8px;">SAVING</div>
@@ -610,22 +610,27 @@ with grid_left:
     
     st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend (Clear Movement Scale)</div>", unsafe_allow_html=True)
+    # Temperature Trend with Unified, Identical Primary and Secondary Scales
+    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend (°C)</div>", unsafe_allow_html=True)
     fig_temp = go.Figure()
     
+    # Comfort Band Shading (22.8 - 25.8°C)
     fig_temp.add_hrect(
         y0=22.8, y1=25.8, line_width=0, fillcolor="#22c55e", opacity=0.18,
         annotation_text="Comfort Range (22.8 - 25.8°C)", annotation_position="top right", annotation_font_size=13
     )
+    # Setpoint (24.0°C)
     fig_temp.add_hline(
         y=24.0, line_dash="dash", line_color="#10b981", line_width=2.5, 
         annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=13
     )
+    # Zone Temperature (Primary axis)
     fig_temp.add_trace(go.Scatter(
         x=df_live.index, y=df_live['predictive_room_temperature_C'],
         mode='lines', name='Zone Temperature',
         line=dict(color='#0284c7', width=4)
     ))
+    # Outdoor Temperature (Secondary axis synchronized to the same scale)
     fig_temp.add_trace(go.Scatter(
         x=df_live.index, y=df_live['outdoor_temperature_C'],
         mode='lines', name='Outdoor Temp (Ref)',
@@ -634,13 +639,8 @@ with grid_left:
     ))
     fig_temp.add_vline(x=datetime.combine(active_date, active_time), line_width=2.5, line_color="#ef4444")
 
-    if not day_window_data.empty:
-        t_min = float(day_window_data['predictive_room_temperature_C'].min())
-        t_max = float(day_window_data['predictive_room_temperature_C'].max())
-        y_temp_min = round(min(23.8, t_min - 0.2), 1)
-        y_temp_max = round(max(26.2, t_max + 0.2), 1)
-    else:
-        y_temp_min, y_temp_max = 23.8, 26.5
+    # Unified temperature bounds for both axes (22.0°C to 34.0°C)
+    temp_scale_range = [22.0, 34.0]
 
     fig_temp.update_layout(
         height=380,
@@ -653,17 +653,18 @@ with grid_left:
             title="Zone Temperature (°C)",
             showgrid=True, 
             gridcolor="#f1f5f9", 
-            tickfont=dict(size=14), 
-            range=[y_temp_min, y_temp_max],
-            dtick=0.5
+            tickfont=dict(size=14, color='#0284c7'), 
+            range=temp_scale_range,
+            dtick=2.0
         ),
         yaxis2=dict(
-            title="Outdoor (°C)",
+            title="Outdoor Temperature (°C)",
             overlaying='y',
             side='right',
             showgrid=False,
-            tickfont=dict(size=12, color='#f97316'),
-            range=[15.0, 36.0]
+            tickfont=dict(size=14, color='#f97316'),
+            range=temp_scale_range,
+            dtick=2.0
         ),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
