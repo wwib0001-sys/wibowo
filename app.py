@@ -328,7 +328,7 @@ with col_head_mid:
 with col_head_right:
     st.selectbox("Select Zone:", ["Zone: Innovation Lab", "Zone: Meeting Room", "Zone: Open Workspace"], label_visibility="collapsed")
 
-# --- 5. SEARCHABLE DATE & TIME CONTROL TOOLBAR ---
+# --- 5. SEARCHABLE DATE & TIME CONTROL TOOLBAR (08:00 AM - 06:00 PM) ---
 st.markdown("<div class='filter-toolbar'>", unsafe_allow_html=True)
 c_mode, c_date, c_time = st.columns([1.1, 1.4, 2.0])
 
@@ -338,7 +338,14 @@ with c_mode:
 if is_live_mode:
     active_date = csv_default_date
     st.session_state.active_date = active_date
-    active_time = real_live_time
+    # Clamp live time to the 08:00 - 18:00 window
+    if real_live_time < time(8, 0):
+        active_time = time(8, 0)
+    elif real_live_time > time(18, 0):
+        active_time = time(18, 0)
+    else:
+        active_time = real_live_time
+        
     with c_date:
         st.markdown(f"<div style='font-size: 17px; font-weight: 800; padding-top: 6px; color: #334155;'>📅 Active CSV Date: <b>{active_date.strftime('%a, %d %b %Y')}</b></div>", unsafe_allow_html=True)
     with c_time:
@@ -353,12 +360,22 @@ else:
         active_date = datetime.strptime(sel_date_str, '%a, %d %b %Y').date()
         st.session_state.active_date = active_date
 
+    # Filter available day times strictly between 08:00 AM (08:00) and 06:00 PM (18:00)
     df_day_candidates = df_full[df_full.index.date == active_date]
-    day_times = [t.strftime('%H:%M') for t in df_day_candidates.index.time]
+    day_times = [
+        t.strftime('%H:%M') 
+        for t in df_day_candidates.index.time 
+        if time(8, 0) <= t <= time(18, 0)
+    ]
 
     with c_time:
         if len(day_times) > 0:
-            sel_time_str = st.select_slider("🔍 Scrub / Select Time:", options=day_times, value=day_times[len(day_times)//2])
+            default_slider_val = "12:00" if "12:00" in day_times else day_times[len(day_times)//2]
+            sel_time_str = st.select_slider(
+                "🔍 Select Time (08:00 AM - 06:00 PM):", 
+                options=day_times, 
+                value=default_slider_val
+            )
             h, m = map(int, sel_time_str.split(':'))
             active_time = time(h, m)
         else:
@@ -415,7 +432,7 @@ pct_saved = (energy_saved / sched_energy_today * 100) if sched_energy_today > 0 
 gauge_pct = min(100.0, max(0.0, pct_saved))
 gauge_deg = int((gauge_pct / 100.0) * 360)
 
-# --- 6. TOP SUMMARY SECTION (WITH ENLARGED CIRCLE GAUGE) ---
+# --- 6. TOP SUMMARY SECTION ---
 kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns([0.9, 1.25, 0.85, 0.8, 1.6])
 
 # 1. Occupancy Card
