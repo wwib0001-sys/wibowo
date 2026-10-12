@@ -104,9 +104,9 @@ st.markdown("""
         border-radius: 18px;
         padding: 16px;
         display: flex;
-        flex-direction: column;      /* Emoji stacked vertically above words */
-        align-items: center;          /* Centered horizontally */
-        justify-content: center;      /* Centered vertically */
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
         text-align: center;
         min-height: 205px;
         height: auto;
@@ -458,33 +458,32 @@ with col_top_left:
         </div>
         """, unsafe_allow_html=True)
         
-    # 2. Temperature Card
+    # 2. Temperature Card with Visible Compartment Boundaries and No Little Celsius Sub-unit
     with sub_col2:
         st.markdown(f"""
         <div class="metric-card-box">
             <div class="card-top-title">🌡️ Temperature (°C)</div>
             <div style="display: flex; justify-content: space-around; align-items: center; text-align: center; margin: auto 0;">
-                <div>
-                    <div class="metric-label-muted">Zone Temp.</div>
-                    <div class="metric-main-val" style="font-size: 40px;">{zone_temp:.1f}</div>
-                    <div class="metric-sub-unit">°C</div>
+                <div style="flex: 1;">
+                    <div class="metric-label-muted">Zone</div>
+                    <div class="metric-main-val" style="font-size: 38px;">{zone_temp:.1f}</div>
                 </div>
-                <div>
+                <div style="border-left: 2px solid #e2e8f0; height: 60px;"></div>
+                <div style="flex: 1;">
                     <div class="metric-label-muted">Setpoint</div>
-                    <div class="metric-main-val" style="font-size: 40px;">{setpoint_temp:.1f}</div>
-                    <div class="metric-sub-unit">°C</div>
+                    <div class="metric-main-val" style="font-size: 38px;">{setpoint_temp:.1f}</div>
                 </div>
-                <div>
+                <div style="border-left: 2px solid #e2e8f0; height: 60px;"></div>
+                <div style="flex: 1;">
                     <div class="metric-label-muted">Outdoor</div>
-                    <div class="metric-main-val" style="font-size: 40px;">{outdoor_temp:.1f}</div>
-                    <div class="metric-sub-unit">°C</div>
+                    <div class="metric-main-val" style="font-size: 38px;">{outdoor_temp:.1f}</div>
                 </div>
             </div>
             <div style="height: 4px;"></div>
         </div>
         """, unsafe_allow_html=True)
         
-    # 3. Thermal Comfort Hero Card (EMOJI POSITIONED ABOVE THE WORDS)
+    # 3. Thermal Comfort Hero Card
     with sub_col3:
         is_comfort = (22.8 <= zone_temp <= 25.8)
         comfort_label = "COMFORTABLE" if is_comfort else "DEVIATION"
@@ -492,7 +491,6 @@ with col_top_left:
         bg_comfort = "linear-gradient(135deg, #16a34a 0%, #15803d 100%)" if is_comfort else "linear-gradient(135deg, #d97706 0%, #b45309 100%)"
         st.markdown(f"""
         <div class="comfort-card-box" style="background: {bg_comfort};">
-            <!-- Emoji centered strictly above the text -->
             <div style="font-size: 48px; line-height: 1.1; margin-bottom: 8px;">
                 {comfort_icon}
             </div>
@@ -508,20 +506,31 @@ with col_top_left:
         """, unsafe_allow_html=True)
 
 with col_top_right:
-    # Energy Usage Card
+    # 4. Energy Usage Card with Current Power beside Predictive Energy
     st.markdown(f"""
     <div class="metric-card-box">
-        <div class="card-top-title">⚡ Energy Usage Summary (Since 08:00 AM)</div>
-        <div class="gauge-container" style="padding: 0 16px;">
-            <div style="display: flex; gap: 40px; align-items: center;">
+        <div class="card-top-title">⚡ Energy & Power Status (Since 08:00 AM)</div>
+        <div class="gauge-container" style="padding: 0 12px;">
+            <div style="display: flex; gap: 24px; align-items: center; flex: 1;">
                 <div>
-                    <div class="metric-label-muted">Predictive HVAC (Actual)</div>
-                    <div style="font-size: 38px; font-weight: 900; color: #2563eb; line-height: 1.1;">{pred_energy_today:.2f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span></div>
+                    <div class="metric-label-muted">Current Power</div>
+                    <div style="font-size: 34px; font-weight: 900; color: #0284c7; line-height: 1.1;">
+                        {cur_power:.2f} <span style="font-size: 15px; font-weight: 700; color: #64748b;">kW</span>
+                    </div>
                 </div>
-                <div style="border-left: 2px solid #e2e8f0; height: 60px;"></div>
+                <div style="border-left: 2px solid #e2e8f0; height: 56px;"></div>
+                <div>
+                    <div class="metric-label-muted">Predictive (Today)</div>
+                    <div style="font-size: 34px; font-weight: 900; color: #2563eb; line-height: 1.1;">
+                        {pred_energy_today:.2f} <span style="font-size: 15px; font-weight: 700; color: #64748b;">kWh</span>
+                    </div>
+                </div>
+                <div style="border-left: 2px solid #e2e8f0; height: 56px;"></div>
                 <div>
                     <div class="metric-label-muted">Scheduled Baseline</div>
-                    <div style="font-size: 38px; font-weight: 900; color: #d97706; line-height: 1.1;">{sched_energy_today:.2f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span></div>
+                    <div style="font-size: 34px; font-weight: 900; color: #d97706; line-height: 1.1;">
+                        {sched_energy_today:.2f} <span style="font-size: 15px; font-weight: 700; color: #64748b;">kWh</span>
+                    </div>
                 </div>
             </div>
             <div class="circular-gauge" style="background: conic-gradient(#16a34a 0deg {gauge_deg}deg, #e2e8f0 {gauge_deg}deg 360deg);">
