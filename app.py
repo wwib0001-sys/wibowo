@@ -76,7 +76,7 @@ st.markdown("""
     }
     
     .metric-main-val {
-        font-size: clamp(32px, 3.0vw, 46px);
+        font-size: clamp(32px, 3.0vw, 44px);
         font-weight: 900;
         color: #0f172a;
         line-height: 1.05;
@@ -119,18 +119,18 @@ st.markdown("""
         50% { box-shadow: 0 0 30px rgba(22, 163, 74, 0.65); }
     }
     
-    /* Radial Circular Ring Gauge Styling */
+    /* Enlarged Radial Circular Ring Gauge Styling */
     .gauge-container {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: 14px;
         height: 100%;
     }
     .circular-gauge {
         position: relative;
-        width: 116px;
-        height: 116px;
+        width: 144px;
+        height: 144px;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -139,15 +139,15 @@ st.markdown("""
     }
     .circular-gauge-inner {
         position: absolute;
-        width: 90px;
-        height: 90px;
+        width: 112px;
+        height: 112px;
         background: #ffffff;
         border-radius: 50%;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.06);
+        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.07);
     }
     
     /* Device Status Table */
@@ -415,9 +415,8 @@ pct_saved = (energy_saved / sched_energy_today * 100) if sched_energy_today > 0 
 gauge_pct = min(100.0, max(0.0, pct_saved))
 gauge_deg = int((gauge_pct / 100.0) * 360)
 
-# --- 6. BALANCED TOP SUMMARY SECTION (4 HARMONIOUS COLUMNS) ---
-# Columns: Occupancy (1.0), Temperature (1.35), Comfort (0.85), Energy & Power (1.8)
-kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1.0, 1.35, 0.85, 1.8])
+# --- 6. TOP SUMMARY SECTION (WITH ENLARGED CIRCLE GAUGE) ---
+kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns([0.9, 1.25, 0.85, 0.8, 1.6])
 
 # 1. Occupancy Card
 if pred_occ > cur_occ:
@@ -456,7 +455,7 @@ with kpi_col1:
     </div>
     """, unsafe_allow_html=True)
 
-# 2. Temperature Card (Expanded width with clear divider boundaries)
+# 2. Temperature Card
 with kpi_col2:
     st.markdown(f"""
     <div class="metric-card-box">
@@ -481,7 +480,7 @@ with kpi_col2:
     </div>
     """, unsafe_allow_html=True)
 
-# 3. Thermal Comfort Hero Card (Emoji stacked directly above words)
+# 3. Thermal Comfort Hero Card
 with kpi_col3:
     is_comfort = (22.8 <= zone_temp <= 25.8)
     comfort_label = "COMFORTABLE" if is_comfort else "DEVIATION"
@@ -496,46 +495,58 @@ with kpi_col3:
             <div style="font-size: 12.5px; font-weight: 800; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.5px;">
                 Thermal Comfort
             </div>
-            <div style="font-size: 21px; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2;">
+            <div style="font-size: 20px; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2;">
                 {comfort_label}
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# 4. Energy & Power Status Card (Balanced right segment)
+# 4. Standalone Current Power Card
 with kpi_col4:
     st.markdown(f"""
     <div class="metric-card-box">
-        <div class="card-top-title">⚡ Energy & Power Status (Since 08:00 AM)</div>
-        <div class="gauge-container" style="padding: 0 10px;">
-            <div style="display: flex; gap: 20px; align-items: center; flex: 1;">
+        <div class="card-top-title">⚡ Current Power</div>
+        <div style="text-align: center; margin: auto 0;">
+            <div class="metric-label-muted">Instant Demand</div>
+            <div class="metric-main-val" style="color: #0284c7;">
+                {cur_power:.2f}
+            </div>
+            <div class="metric-sub-unit">kW active load</div>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 800; color: {'#16a34a' if is_cooling else '#64748b'};">
+            <span class="circle-dot {'circle-green' if is_cooling else 'circle-gray'}" style="height: 10px; width: 10px;"></span>
+            <span>{'Compressor Running' if is_cooling else 'Compressor Idle'}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# 5. Standalone Energy Usage Summary Card with Bigger Radial Gauge
+with kpi_col5:
+    st.markdown(f"""
+    <div class="metric-card-box">
+        <div class="card-top-title">📊 Energy Usage (Since 08:00 AM)</div>
+        <div class="gauge-container" style="padding: 0 4px;">
+            <div style="display: flex; flex-direction: column; justify-content: center; gap: 10px;">
                 <div>
-                    <div class="metric-label-muted">Current</div>
-                    <div style="font-size: 32px; font-weight: 900; color: #0284c7; line-height: 1.1;">
-                        {cur_power:.2f} <span style="font-size: 14px; font-weight: 700; color: #64748b;">kW</span>
+                    <div class="metric-label-muted" style="font-size: 12px;">Predictive HVAC</div>
+                    <div style="font-size: 26px; font-weight: 900; color: #2563eb; line-height: 1.0;">
+                        {pred_energy_today:.2f} <span style="font-size: 13px; font-weight: 700; color: #64748b;">kWh</span>
                     </div>
                 </div>
-                <div style="border-left: 2px solid #e2e8f0; height: 54px;"></div>
-                <div>
-                    <div class="metric-label-muted">Predictive</div>
-                    <div style="font-size: 32px; font-weight: 900; color: #2563eb; line-height: 1.1;">
-                        {pred_energy_today:.2f} <span style="font-size: 14px; font-weight: 700; color: #64748b;">kWh</span>
-                    </div>
-                </div>
-                <div style="border-left: 2px solid #e2e8f0; height: 54px;"></div>
-                <div>
-                    <div class="metric-label-muted">Baseline</div>
-                    <div style="font-size: 32px; font-weight: 900; color: #d97706; line-height: 1.1;">
-                        {sched_energy_today:.2f} <span style="font-size: 14px; font-weight: 700; color: #64748b;">kWh</span>
+                <div style="border-top: 1.5px solid #f1f5f9; padding-top: 6px;">
+                    <div class="metric-label-muted" style="font-size: 12px;">Scheduled Baseline</div>
+                    <div style="font-size: 26px; font-weight: 900; color: #d97706; line-height: 1.0;">
+                        {sched_energy_today:.2f} <span style="font-size: 13px; font-weight: 700; color: #64748b;">kWh</span>
                     </div>
                 </div>
             </div>
+            <!-- Enlarged Circular Radial Progress Ring Gauge -->
             <div class="circular-gauge" style="background: conic-gradient(#16a34a 0deg {gauge_deg}deg, #e2e8f0 {gauge_deg}deg 360deg);">
                 <div class="circular-gauge-inner">
-                    <div style="font-size: 10px; font-weight: 800; color: #16a34a; text-transform: uppercase; letter-spacing: 0.5px;">SAVING</div>
-                    <div style="font-size: 26px; font-weight: 900; color: #0f172a; line-height: 1;">{pct_saved:.1f}%</div>
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b;">-{energy_saved:.2f} kWh</div>
+                    <div style="font-size: 11px; font-weight: 900; color: #16a34a; text-transform: uppercase; letter-spacing: 0.8px;">SAVING</div>
+                    <div style="font-size: 32px; font-weight: 900; color: #0f172a; line-height: 1.05;">{pct_saved:.1f}%</div>
+                    <div style="font-size: 12px; font-weight: 700; color: #64748b; margin-top: 2px;">-{energy_saved:.2f} kWh</div>
                 </div>
             </div>
         </div>
