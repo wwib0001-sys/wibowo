@@ -242,7 +242,7 @@ components.html("""
 </script>
 """, height=0, width=0)
 
-# --- 3. DATA LOADING & DYNAMIC CLOCK SYNC ---
+# --- 3. DATA LOADING & CSV DATE PARSING ---
 @st.cache_data(ttl=60)
 def load_data():
     try:
@@ -275,7 +275,12 @@ def load_data():
 df_full = load_data()
 available_dates = df_full.index.normalize().unique().date
 
-# Active Live Melbourne Clock (AEDT/AEST)
+# Select default date based on CSV data (2025)
+# Prioritize September 29, 2025 if present, otherwise latest date in CSV
+sep29_candidates = [d for d in available_dates if d.year == 2025 and d.month == 9 and d.day == 29]
+csv_default_date = sep29_candidates[0] if sep29_candidates else available_dates[-1]
+
+# Real-time Melbourne Clock
 try:
     import pytz
     melbourne_tz = pytz.timezone('Australia/Melbourne')
@@ -284,14 +289,13 @@ except Exception:
     melbourne_tz = timezone(timedelta(hours=11))
     now_melbourne = datetime.now(melbourne_tz)
 
-real_live_date = now_melbourne.date()
 real_live_time = now_melbourne.time()
 
-# Dataset benchmark fallback: If live date is outside CSV range, map to benchmark date
-sep29_dates = [d for d in available_dates if d.month == 9 and d.day == 29]
-benchmark_date = sep29_dates[0] if sep29_dates else available_dates[-1]
+# --- 4. TOP HEADER BAR (SYNCHRONIZED WITH CSV DATE & YEAR) ---
+# Date selection state initialization
+if 'active_date' not in st.session_state:
+    st.session_state.active_date = csv_default_date
 
-# --- 4. TOP HEADER BAR ---
 col_head_left, col_head_mid, col_head_right = st.columns([2.5, 1.3, 1.0])
 
 with col_head_left:
@@ -303,10 +307,11 @@ with col_head_left:
     """, unsafe_allow_html=True)
 
 with col_head_mid:
+    header_date_str = st.session_state.active_date.strftime('%a, %d %b %Y')
     st.markdown(f"""
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 24px; margin-top: 6px;">
             <div style="text-align: right; line-height: 1.2;">
-                <div style="font-size: 16px; color: #64748b; font-weight: 800;">📅 {now_melbourne.strftime('%a, %d %b %Y')}</div>
+                <div style="font-size: 16px; color: #64748b; font-weight: 800;">📅 {header_date_str}</div>
                 <div style="font-size: 28px; font-weight: 900; color: #0f172a;">{now_melbourne.strftime('%H:%M:%S')}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
@@ -327,23 +332,26 @@ st.markdown("<div class='filter-toolbar'>", unsafe_allow_html=True)
 c_mode, c_date, c_time = st.columns([1.1, 1.4, 2.0])
 
 with c_mode:
-    is_live_mode = st.toggle("🔴 Real-Time Clock Sync", value=True, help="Toggle OFF to search and jump to any historical date/time.")
+    is_live_mode = st.toggle("🔴 Real-Time Clock Sync", value=True, help="Toggle OFF to search and jump to any historical date/time in the dataset.")
 
 if is_live_mode:
-    display_date_str = now_melbourne.strftime('%a, %d %b %Y')
-    active_date = benchmark_date
+    active_date = csv_default_date
+    st.session_state.active_date = active_date
     active_time = real_live_time
     with c_date:
-        st.markdown(f"<div style='font-size: 17px; font-weight: 800; padding-top: 6px; color: #334155;'>📅 Live Date: <b>{display_date_str}</b></div>", unsafe_allow_html=True)
+        # Date & Year based directly on the dataset (e.g. Mon, 29 Sep 2025)
+        st.markdown(f"<div style='font-size: 17px; font-weight: 800; padding-top: 6px; color: #334155;'>📅 Active CSV Date: <b>{active_date.strftime('%a, %d %b %Y')}</b></div>", unsafe_allow_html=True)
     with c_time:
         tz_abbr = now_melbourne.strftime('%Z') or "AEDT"
         st.markdown(f"<div style='font-size: 17px; font-weight: 800; padding-top: 6px; color: #2563eb;'>⏱️ Real-Time Tracking: <b>{active_time.strftime('%H:%M:%S')} ({tz_abbr})</b></div>", unsafe_allow_html=True)
 else:
     with c_date:
         date_options = [d.strftime('%a, %d %b %Y') for d in available_dates]
-        default_idx = [d.strftime('%Y-%m-%d') for d in available_dates].index(benchmark_date.strftime('%Y-%m-%d')) if benchmark_date.strftime('%Y-%m-%d') in [d.strftime('%Y-%m-%d') for d in available_dates] else len(date_options)-1
-        sel_date_str = st.selectbox("🔍 Search Date:", options=date_options, index=default_idx)
+        default_str = csv_default_date.strftime('%a, %d %b %Y')
+        default_idx = date_options.index(default_str) if default_str in date_options else len(date_options)-1
+        sel_date_str = st.selectbox("🔍 Search Date & Year:", options=date_options, index=default_idx)
         active_date = datetime.strptime(sel_date_str, '%a, %d %b %Y').date()
+        st.session_state.active_date = active_date
 
     df_day_candidates = df_full[df_full.index.date == active_date]
     day_times = [t.strftime('%H:%M') for t in df_day_candidates.index.time]
@@ -380,7 +388,6 @@ is_cooling = cur_power > 0.05
 hvac_on = cur_power > 0.0
 
 # --- ENERGY CALCULATIONS (INTERVAL STEP KWH & CUMULATIVE KWH FROM 08:00 AM) ---
-# Interval non-cumulative energy per 5-min step: kWh = Power (kW) * (5 / 60)
 df_day['pred_kwh_interval'] = df_day['predictive_hvac_power_kW'] * (5.0 / 60.0)
 df_day['sched_kwh_interval'] = df_day['scheduled_hvac_power_kW'] * (5.0 / 60.0)
 
@@ -481,7 +488,7 @@ with col_top_left:
         """, unsafe_allow_html=True)
 
 with col_top_right:
-    # Energy Usage Card (Full Width in Right Column, Aligned over Energy Chart)
+    # Energy Usage Card
     st.markdown(f"""
     <div class="metric-card-box">
         <div class="card-top-title">⚡ Energy Usage Summary (Since 08:00 AM)</div>
@@ -609,7 +616,6 @@ with grid_left:
 
 # --- RIGHT COLUMN: UNIFIED CUMULATIVE & NON-CUMULATIVE ENERGY GRAPH + DEVICE STATUS ---
 with grid_right:
-    # Unified Energy Consumption Graph: Non-Cumulative (Primary Y1, kW / 5-min step) & Cumulative (Secondary Y2, kWh)
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Energy Profile: Power Draw & Cumulative Energy (kWh)</div>", unsafe_allow_html=True)
     fig_energy = go.Figure()
     
@@ -646,7 +652,6 @@ with grid_right:
     
     fig_energy.add_vline(x=datetime.combine(active_date, active_time), line_width=2.5, line_color="#ef4444")
     
-    # Dynamic ranges
     max_cum_e = day_window_data['sched_energy_cum_day'].max() if not day_window_data.empty else 5.0
     y_energy_cum_upper = max(2.0, round(float(max_cum_e) + 0.6, 1))
 
