@@ -542,7 +542,7 @@ with kpi_col4:
 with kpi_col5:
     st.markdown(f"""
     <div class="metric-card-box">
-        <div class="card-top-title">📊 Energy Usage (Since 08:00 AM)</div>
+        <div class="card-top-title">📊 Daily Energy Usage (Since 08:00 AM)</div>
         <div class="gauge-container" style="padding: 0 4px;">
             <div style="display: flex; flex-direction: column; justify-content: center; gap: 10px;">
                 <div>
