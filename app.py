@@ -150,39 +150,6 @@ st.markdown("""
         box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.07);
     }
     
-    /* Device Status Table */
-    .status-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 18px;
-    }
-    .status-table th {
-        background-color: #e2e8f0;
-        color: #334155;
-        font-weight: 800;
-        padding: 13px 20px;
-        text-align: left;
-    }
-    .status-table td {
-        padding: 11px 20px;
-        border-bottom: 1px solid #f1f5f9;
-        color: #0f172a;
-        font-weight: 700;
-    }
-    .badge-on {
-        color: #16a34a;
-        font-weight: 900;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .badge-off {
-        color: #94a3b8;
-        font-weight: 800;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
     .circle-dot {
         height: 14px;
         width: 14px;
@@ -196,6 +163,20 @@ st.markdown("""
     }
     .circle-green { background-color: #16a34a; box-shadow: 0 0 10px rgba(22, 163, 74, 0.8); }
     .circle-gray { background-color: #94a3b8; }
+
+    /* Monthly Savings Card Styling */
+    .monthly-card {
+        background: #ffffff;
+        border: 1.5px solid #bbf7d0;
+        border-radius: 16px;
+        padding: 16px 24px;
+        margin-bottom: 22px;
+        box-shadow: 0 4px 14px rgba(22, 163, 74, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        text-align: center;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -402,7 +383,7 @@ cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
 is_cooling = cur_power > 0.05
 hvac_on = cur_power > 0.0
 
-# --- ENERGY CALCULATIONS (FROM 08:00 AM) ---
+# --- DAILY ENERGY CALCULATIONS (FROM 08:00 AM) ---
 df_day['pred_kwh_interval'] = df_day['predictive_hvac_power_kW'] * (5.0 / 60.0)
 df_day['sched_kwh_interval'] = df_day['scheduled_hvac_power_kW'] * (5.0 / 60.0)
 
@@ -430,7 +411,22 @@ pct_saved = (energy_saved / sched_energy_today * 100) if sched_energy_today > 0 
 gauge_pct = min(100.0, max(0.0, pct_saved))
 gauge_deg = int((gauge_pct / 100.0) * 360)
 
-# --- 6. TOP SUMMARY SECTION ---
+# --- MONTHLY CUMULATIVE ENERGY SAVINGS CALCULATION ---
+active_month = active_date.month
+active_year = active_date.year
+
+df_month = df_full[(df_full.index.year == active_year) & (df_full.index.month == active_month)].copy()
+# Filter only office hours 08:00 to 18:00 for each day in month
+month_work_mask = (df_month.index.time >= time(8, 0)) & (df_month.index.time <= time(18, 0))
+df_month_work = df_month[month_work_mask].copy()
+
+month_pred_energy = (df_month_work['predictive_hvac_power_kW'] * (5.0 / 60.0)).sum()
+month_sched_energy = (df_month_work['scheduled_hvac_power_kW'] * (5.0 / 60.0)).sum()
+month_saved_energy = max(0.0, month_sched_energy - month_pred_energy)
+month_pct_saved = (month_saved_energy / month_sched_energy * 100) if month_sched_energy > 0 else 0.0
+month_name = datetime(active_year, active_month, 1).strftime('%B %Y')
+
+# --- 6. TOP SUMMARY SECTION (WITH "Daily Energy Usage") ---
 kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns([0.9, 1.25, 0.85, 0.8, 1.6])
 
 # 1. Occupancy Card
@@ -536,11 +532,11 @@ with kpi_col4:
     </div>
     """, unsafe_allow_html=True)
 
-# 5. Energy Usage Summary Card with Predictive HVAC & Baseline SIDE BY SIDE
+# 5. Energy Usage Summary Card with "Daily" in front of "Usage"
 with kpi_col5:
     st.markdown(f"""
     <div class="metric-card-box">
-        <div class="card-top-title">📊 Energy Usage (Since 08:00 AM)</div>
+        <div class="card-top-title">📊 Daily Energy Usage (Since 08:00 AM)</div>
         <div class="gauge-container" style="padding: 0 4px;">
             <div style="display: flex; align-items: center; justify-content: space-around; flex: 1; text-align: center; gap: 14px;">
                 <div>
@@ -570,12 +566,44 @@ with kpi_col5:
     </div>
     """, unsafe_allow_html=True)
 
+st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
+
+# --- 7. MONTHLY CUMULATIVE ENERGY SAVINGS (CLICK OPTION TO SHOW) ---
+with st.expander(f"📅 View Monthly Cumulative Energy Savings ({month_name})"):
+    st.markdown(f"""
+    <div class="monthly-card">
+        <div>
+            <div class="metric-label-muted">Monthly Predictive Consumed</div>
+            <div style="font-size: 34px; font-weight: 900; color: #2563eb; line-height: 1.1;">
+                {month_pred_energy:.1f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span>
+            </div>
+            <div class="metric-sub-unit">{month_name} office hours</div>
+        </div>
+        <div style="border-left: 2px solid #cbd5e1; height: 60px;"></div>
+        <div>
+            <div class="metric-label-muted">Monthly Scheduled Baseline</div>
+            <div style="font-size: 34px; font-weight: 900; color: #d97706; line-height: 1.1;">
+                {month_sched_energy:.1f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span>
+            </div>
+            <div class="metric-sub-unit">Uncontrolled baseline</div>
+        </div>
+        <div style="border-left: 2px solid #cbd5e1; height: 60px;"></div>
+        <div>
+            <div class="metric-label-muted" style="color: #16a34a;">Cumulative Monthly Savings</div>
+            <div style="font-size: 40px; font-weight: 900; color: #16a34a; line-height: 1.1;">
+                -{month_saved_energy:.1f} <span style="font-size: 16px; font-weight: 700; color: #15803d;">kWh</span>
+            </div>
+            <div style="font-size: 16px; font-weight: 800; color: #15803d;">{month_pct_saved:.1f}% Energy Reduction</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
 
-# --- 7. MAIN BODY: LOWER 2-COLUMN GRAPH SECTION ---
+# --- 8. MAIN BODY: 2-COLUMN BALANCED GRAPH SECTION (NO TEMP GRAPH & NO SENSOR TABLE) ---
 grid_left, grid_right = st.columns([1.0, 1.0])
 
-# --- LEFT COLUMN: OCCUPANCY & TEMPERATURE GRAPHS ---
+# Left: Occupancy Tracking & 15 Minute Ahead Forecast
 with grid_left:
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>👥 Occupancy Tracking & 15 Minute Ahead Forecast</div>", unsafe_allow_html=True)
     
@@ -597,7 +625,7 @@ with grid_left:
     fig_occ.add_vline(x=datetime.combine(active_date, active_time), line_width=2.5, line_color="#ef4444")
 
     fig_occ.update_layout(
-        height=380,
+        height=430,
         margin=dict(l=25, r=25, t=10, b=25),
         xaxis_title="", yaxis_title="People",
         plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
@@ -607,72 +635,10 @@ with grid_left:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
     )
     st.plotly_chart(fig_occ, use_container_width=True)
-    
-    st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
 
-    # Temperature Trend with Unified, Identical Primary and Secondary Scales
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend (°C)</div>", unsafe_allow_html=True)
-    fig_temp = go.Figure()
-    
-    # Comfort Band Shading (22.8 - 25.8°C)
-    fig_temp.add_hrect(
-        y0=22.8, y1=25.8, line_width=0, fillcolor="#22c55e", opacity=0.18,
-        annotation_text="Comfort Range (22.8 - 25.8°C)", annotation_position="top right", annotation_font_size=13
-    )
-    # Setpoint (24.0°C)
-    fig_temp.add_hline(
-        y=24.0, line_dash="dash", line_color="#10b981", line_width=2.5, 
-        annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=13
-    )
-    # Zone Temperature (Primary axis)
-    fig_temp.add_trace(go.Scatter(
-        x=df_live.index, y=df_live['predictive_room_temperature_C'],
-        mode='lines', name='Zone Temperature',
-        line=dict(color='#0284c7', width=4)
-    ))
-    # Outdoor Temperature (Secondary axis synchronized to the same scale)
-    fig_temp.add_trace(go.Scatter(
-        x=df_live.index, y=df_live['outdoor_temperature_C'],
-        mode='lines', name='Outdoor Temp (Ref)',
-        line=dict(color='#f97316', width=2.5, dash='dot'),
-        yaxis='y2'
-    ))
-    fig_temp.add_vline(x=datetime.combine(active_date, active_time), line_width=2.5, line_color="#ef4444")
-
-    # Unified temperature bounds for both axes (22.0°C to 34.0°C)
-    temp_scale_range = [22.0, 34.0]
-
-    fig_temp.update_layout(
-        height=380,
-        margin=dict(l=25, r=25, t=10, b=25),
-        xaxis_title="", 
-        plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-        font=dict(color="#334155", size=15),
-        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=14), range=[t_start, t_end]),
-        yaxis=dict(
-            title="Zone Temperature (°C)",
-            showgrid=True, 
-            gridcolor="#f1f5f9", 
-            tickfont=dict(size=14, color='#0284c7'), 
-            range=temp_scale_range,
-            dtick=2.0
-        ),
-        yaxis2=dict(
-            title="Outdoor Temperature (°C)",
-            overlaying='y',
-            side='right',
-            showgrid=False,
-            tickfont=dict(size=14, color='#f97316'),
-            range=temp_scale_range,
-            dtick=2.0
-        ),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=14))
-    )
-    st.plotly_chart(fig_temp, use_container_width=True)
-
-# --- RIGHT COLUMN: UNIFIED CUMULATIVE & NON-CUMULATIVE ENERGY GRAPH + DEVICE STATUS ---
+# Right: Unified Cumulative & Non-Cumulative Daily Energy Graph
 with grid_right:
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Energy Profile: Power Draw & Cumulative Energy (kWh)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Daily Energy Profile: Power Demand & Cumulative Energy (kWh)</div>", unsafe_allow_html=True)
     fig_energy = go.Figure()
     
     df_live_plot = df_live[df_live.index >= t_start]
@@ -712,7 +678,7 @@ with grid_right:
     y_energy_cum_upper = max(2.0, round(float(max_cum_e) + 0.6, 1))
 
     fig_energy.update_layout(
-        height=380,
+        height=430,
         margin=dict(l=25, r=25, t=10, b=25),
         xaxis_title="", 
         plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
@@ -738,39 +704,6 @@ with grid_right:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=12))
     )
     st.plotly_chart(fig_energy, use_container_width=True)
-    
-    st.markdown("<div style='margin-bottom: 18px;'></div>", unsafe_allow_html=True)
-
-    # Device Status Table
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>⚙️ HVAC Device & Sensor Infrastructure Status</div>", unsafe_allow_html=True)
-    
-    hvac_status_str = "<span class='badge-on'><span class='circle-dot circle-green'></span> ON</span>" if hvac_on else "<span class='badge-off'><span class='circle-dot circle-gray'></span> OFF</span>"
-    cooling_str = "<span class='badge-on'><span class='circle-dot circle-green'></span> ACTIVE</span>" if is_cooling else "<span class='badge-off'><span class='circle-dot circle-gray'></span> IDLE</span>"
-    damper_str = "<span class='badge-on'><span class='circle-dot circle-green'></span> OPEN</span>" if cur_occ > 0 else "<span class='badge-off'><span class='circle-dot circle-gray'></span> MINIMUM</span>"
-    occ_status_val = df_live['occupancystatus'].iloc[-1] if 'occupancystatus' in df_live.columns and pd.notna(df_live['occupancystatus'].iloc[-1]) else "ONLINE"
-    
-    table_html = f"""
-    <div style="background-color: #ffffff; border-radius: 16px; border: 1.5px solid #cbd5e1; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.03); height: 380px; display: flex; flex-direction: column; justify-content: center;">
-        <table class="status-table">
-            <thead>
-                <tr>
-                    <th>Device Component</th>
-                    <th>Operating State</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr><td>HVAC Compressor Unit</td><td>{hvac_status_str}</td></tr>
-                <tr><td>Variable Air Supply Fan</td><td>{hvac_status_str}</td></tr>
-                <tr><td>Outdoor Air Damper</td><td>{damper_str}</td></tr>
-                <tr><td>Cooling Loop Valve</td><td>{cooling_str}</td></tr>
-                <tr><td>Occupancy IoT Sensor</td><td><span class='badge-on'><span class='circle-dot circle-green'></span> {occ_status_val}</span></td></tr>
-                <tr><td>Indoor Room Temp. Sensor</td><td><span class='badge-on'><span class='circle-dot circle-green'></span> ONLINE</span></td></tr>
-                <tr><td>Weather / Outdoor Sensor</td><td><span class='badge-on'><span class='circle-dot circle-green'></span> ONLINE</span></td></tr>
-            </tbody>
-        </table>
-    </div>
-    """
-    st.markdown(table_html, unsafe_allow_html=True)
 
 # Bottom spacing to keep the auto-scroll loop smooth on all TV resolutions
 st.markdown("<div style='height: 120px;'></div>", unsafe_allow_html=True)
