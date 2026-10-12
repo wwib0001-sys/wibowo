@@ -243,11 +243,14 @@ def load_data():
     return df
 
 df_full = load_data()
-available_dates = df_full.index.normalize().unique().date
+all_dates = df_full.index.normalize().unique().date
 
-# Select default benchmark date based on CSV data (2025)
-sep29_candidates = [d for d in available_dates if d.year == 2025 and d.month == 9 and d.day == 29]
-csv_default_date = sep29_candidates[0] if sep29_candidates else available_dates[-1]
+# Filter out weekend days (Saturday=5, Sunday=6) -> Keep only Monday to Friday
+business_dates = [d for d in all_dates if d.weekday() < 5]
+
+# Select default benchmark date based on business dates (prioritize Monday, Sep 29, 2025)
+sep29_candidates = [d for d in business_dates if d.year == 2025 and d.month == 9 and d.day == 29]
+csv_default_date = sep29_candidates[0] if sep29_candidates else business_dates[-1]
 
 # Real-time Melbourne Clock
 try:
@@ -295,12 +298,12 @@ with col_head_mid:
 with col_head_right:
     st.selectbox("Select Zone:", ["Zone: Innovation Lab", "Zone: Meeting Room", "Zone: Open Workspace"], label_visibility="collapsed")
 
-# --- 5. SEARCHABLE DATE & TIME CONTROL TOOLBAR WITH MONTHLY TRACKING OPTION ---
+# --- 5. SEARCHABLE DATE & TIME CONTROL TOOLBAR (WEEKDAYS ONLY) ---
 st.markdown("<div class='filter-toolbar'>", unsafe_allow_html=True)
 c_mode, c_date, c_time, c_track = st.columns([1.0, 1.3, 1.7, 1.2])
 
 with c_mode:
-    is_live_mode = st.toggle("🔴 Real-Time Clock Sync", value=True, help="Toggle OFF to search and jump to any historical date/time in the dataset.")
+    is_live_mode = st.toggle("🔴 Real-Time Clock Sync", value=True, help="Toggle OFF to search and jump to any historical business day.")
 
 if is_live_mode:
     active_date = csv_default_date
@@ -319,10 +322,11 @@ if is_live_mode:
         st.markdown(f"<div style='font-size: 16px; font-weight: 800; padding-top: 6px; color: #2563eb;'>⏱️ Real-Time: <b>{active_time.strftime('%H:%M:%S')} ({tz_abbr})</b></div>", unsafe_allow_html=True)
 else:
     with c_date:
-        date_options = [d.strftime('%a, %d %b %Y') for d in available_dates]
+        # Strictly weekdays in the date selector dropdown
+        date_options = [d.strftime('%a, %d %b %Y') for d in business_dates]
         default_str = csv_default_date.strftime('%a, %d %b %Y')
         default_idx = date_options.index(default_str) if default_str in date_options else len(date_options)-1
-        sel_date_str = st.selectbox("🔍 Search Date:", options=date_options, index=default_idx)
+        sel_date_str = st.selectbox("🔍 Search Date (Mon–Fri):", options=date_options, index=default_idx)
         active_date = datetime.strptime(sel_date_str, '%a, %d %b %Y').date()
         st.session_state.active_date = active_date
 
@@ -349,7 +353,7 @@ else:
 with c_track:
     energy_view_mode = st.radio(
         "Energy Tracking Scope:",
-        options=["Daily (08:00-18:00)", "Monthly Cumulative (8am-6pm)"],
+        options=["Daily (08:00-18:00)", "Monthly Cumulative (Mon-Fri)"],
         horizontal=True,
         index=0
     )
@@ -402,27 +406,31 @@ else:
 daily_energy_saved = max(0.0, sched_energy_today - pred_energy_today)
 daily_pct_saved = (daily_energy_saved / sched_energy_today * 100) if sched_energy_today > 0 else 0.0
 
-# --- MONTHLY CUMULATIVE ENERGY (8 AM - 6 PM EACH DAY) ---
+# --- MONTHLY CUMULATIVE ENERGY (WEEKDAYS ONLY: 8 AM - 6 PM) ---
 active_month = active_date.month
 active_year = active_date.year
 month_name = datetime(active_year, active_month, 1).strftime('%B %Y')
 
-# Filter entire month dataset, keeping ONLY rows within 08:00 AM to 06:00 PM
+# Filter month dataset: WEEKDAYS ONLY (dayofweek < 5) AND 08:00 AM to 06:00 PM
 df_month_raw = df_full[(df_full.index.year == active_year) & (df_full.index.month == active_month)].copy()
-mask_work_hours = (df_month_raw.index.time >= time(8, 0)) & (df_month_raw.index.time <= time(18, 0))
-df_month_hours = df_month_raw[mask_work_hours].copy()
+mask_business_hours = (
+    (df_month_raw.index.dayofweek < 5) & 
+    (df_month_raw.index.time >= time(8, 0)) & 
+    (df_month_raw.index.time <= time(18, 0))
+)
+df_month_hours = df_month_raw[mask_business_hours].copy()
 
 # Step kWh = Power (kW) * (5/60)
 df_month_hours['step_pred_kwh'] = df_month_hours['predictive_hvac_power_kW'] * (5.0 / 60.0)
 df_month_hours['step_sched_kwh'] = df_month_hours['scheduled_hvac_power_kW'] * (5.0 / 60.0)
 
-# Aggregate daily consumption during 08:00 AM - 06:00 PM for each date in the month
+# Aggregate daily consumption per business date
 daily_summary = df_month_hours.groupby(df_month_hours.index.date).agg({
     'step_pred_kwh': 'sum',
     'step_sched_kwh': 'sum'
 }).rename(columns={'step_pred_kwh': 'pred_kwh', 'step_sched_kwh': 'sched_kwh'})
 
-# Calculate chronological month-to-date cumulative energy
+# Chronological month-to-date cumulative energy (Mon-Fri only)
 daily_summary['pred_kwh_cum'] = daily_summary['pred_kwh'].cumsum()
 daily_summary['sched_kwh_cum'] = daily_summary['sched_kwh'].cumsum()
 daily_summary['saved_kwh_cum'] = (daily_summary['sched_kwh_cum'] - daily_summary['pred_kwh_cum']).clip(lower=0.0)
@@ -439,9 +447,9 @@ else:
 
 month_pct_saved = (month_cum_saved / month_cum_sched * 100) if month_cum_sched > 0 else 0.0
 
-# Values to display on Card #5 based on radio toggle
-if energy_view_mode == "Monthly Cumulative (8am-6pm)":
-    card_title = f"📊 Monthly Cumulative Energy ({month_name}, 8am-6pm)"
+# Values to display on Card #5 based on toggle
+if energy_view_mode == "Monthly Cumulative (Mon-Fri)":
+    card_title = f"📊 Monthly Cumulative Energy ({month_name}, Mon–Fri)"
     disp_pred = month_cum_pred
     disp_sched = month_cum_sched
     disp_saved = month_cum_saved
@@ -562,7 +570,7 @@ with kpi_col4:
     </div>
     """, unsafe_allow_html=True)
 
-# 5. Energy Usage Summary Card (Dynamically Switches Daily / Monthly Scope)
+# 5. Energy Usage Summary Card
 with kpi_col5:
     st.markdown(f"""
     <div class="metric-card-box">
@@ -636,13 +644,13 @@ with grid_left:
 
 # Right Column: Energy Graph (Switches between Daily Profile and Monthly Cumulative Progression)
 with grid_right:
-    if energy_view_mode == "Monthly Cumulative (8am-6pm)":
-        st.markdown(f"<div class='card-top-title' style='margin-bottom: 12px;'>📊 Monthly Cumulative Energy Progression ({month_name}, 8am-6pm)</div>", unsafe_allow_html=True)
+    if energy_view_mode == "Monthly Cumulative (Mon-Fri)":
+        st.markdown(f"<div class='card-top-title' style='margin-bottom: 12px;'>📊 Monthly Cumulative Energy Progression ({month_name}, Mon–Fri)</div>", unsafe_allow_html=True)
         fig_energy = go.Figure()
 
-        dates_list = [d.strftime('%d %b') for d in daily_summary.index]
+        dates_list = [d.strftime('%a %d %b') for d in daily_summary.index]
 
-        # Scheduled Baseline Cumulative
+        # Scheduled Baseline Cumulative (Business Days Only)
         fig_energy.add_trace(go.Scatter(
             x=dates_list, y=daily_summary['sched_kwh_cum'],
             mode='lines+markers', name='Baseline Cumulative (kWh)',
@@ -650,7 +658,7 @@ with grid_right:
             marker=dict(size=6)
         ))
         
-        # Predictive HVAC Cumulative
+        # Predictive HVAC Cumulative (Business Days Only)
         fig_energy.add_trace(go.Scatter(
             x=dates_list, y=daily_summary['pred_kwh_cum'],
             mode='lines+markers', name='Predictive Cumulative (kWh)',
@@ -660,7 +668,7 @@ with grid_right:
         ))
 
         # Mark active date
-        active_label = active_date.strftime('%d %b')
+        active_label = active_date.strftime('%a %d %b')
         if active_label in dates_list:
             fig_energy.add_vline(x=active_label, line_width=2.5, line_color="#ef4444")
 
@@ -669,11 +677,11 @@ with grid_right:
         fig_energy.update_layout(
             height=430,
             margin=dict(l=25, r=25, t=10, b=25),
-            xaxis_title="Date (Operating Window 08:00 - 18:00)", 
+            xaxis_title="Business Day (08:00 AM - 06:00 PM)", 
             yaxis_title="Cumulative Energy (kWh)",
             plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
             font=dict(color="#334155", size=14),
-            xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13)),
+            xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=12)),
             yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[0.0, y_max], zeroline=False),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=12))
         )
