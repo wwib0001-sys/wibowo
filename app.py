@@ -163,20 +163,6 @@ st.markdown("""
     }
     .circle-green { background-color: #16a34a; box-shadow: 0 0 10px rgba(22, 163, 74, 0.8); }
     .circle-gray { background-color: #94a3b8; }
-
-    /* Monthly Savings Card Styling */
-    .monthly-card {
-        background: #ffffff;
-        border: 1.5px solid #bbf7d0;
-        border-radius: 16px;
-        padding: 16px 24px;
-        margin-bottom: 22px;
-        box-shadow: 0 4px 14px rgba(22, 163, 74, 0.08);
-        display: flex;
-        align-items: center;
-        justify-content: space-around;
-        text-align: center;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -411,22 +397,7 @@ pct_saved = (energy_saved / sched_energy_today * 100) if sched_energy_today > 0 
 gauge_pct = min(100.0, max(0.0, pct_saved))
 gauge_deg = int((gauge_pct / 100.0) * 360)
 
-# --- MONTHLY CUMULATIVE ENERGY SAVINGS CALCULATION ---
-active_month = active_date.month
-active_year = active_date.year
-
-df_month = df_full[(df_full.index.year == active_year) & (df_full.index.month == active_month)].copy()
-# Filter only office hours 08:00 to 18:00 for each day in month
-month_work_mask = (df_month.index.time >= time(8, 0)) & (df_month.index.time <= time(18, 0))
-df_month_work = df_month[month_work_mask].copy()
-
-month_pred_energy = (df_month_work['predictive_hvac_power_kW'] * (5.0 / 60.0)).sum()
-month_sched_energy = (df_month_work['scheduled_hvac_power_kW'] * (5.0 / 60.0)).sum()
-month_saved_energy = max(0.0, month_sched_energy - month_pred_energy)
-month_pct_saved = (month_saved_energy / month_sched_energy * 100) if month_sched_energy > 0 else 0.0
-month_name = datetime(active_year, active_month, 1).strftime('%B %Y')
-
-# --- 6. TOP SUMMARY SECTION (WITH "Daily Energy Usage") ---
+# --- 6. TOP SUMMARY SECTION ---
 kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns([0.9, 1.25, 0.85, 0.8, 1.6])
 
 # 1. Occupancy Card
@@ -532,7 +503,7 @@ with kpi_col4:
     </div>
     """, unsafe_allow_html=True)
 
-# 5. Energy Usage Summary Card with "Daily" in front of "Usage"
+# 5. Energy Usage Summary Card
 with kpi_col5:
     st.markdown(f"""
     <div class="metric-card-box">
@@ -566,41 +537,9 @@ with kpi_col5:
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
-
-# --- 7. MONTHLY CUMULATIVE ENERGY SAVINGS (CLICK OPTION TO SHOW) ---
-with st.expander(f"📅 View Monthly Cumulative Energy Savings ({month_name})"):
-    st.markdown(f"""
-    <div class="monthly-card">
-        <div>
-            <div class="metric-label-muted">Monthly Predictive Consumed</div>
-            <div style="font-size: 34px; font-weight: 900; color: #2563eb; line-height: 1.1;">
-                {month_pred_energy:.1f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span>
-            </div>
-            <div class="metric-sub-unit">{month_name} office hours</div>
-        </div>
-        <div style="border-left: 2px solid #cbd5e1; height: 60px;"></div>
-        <div>
-            <div class="metric-label-muted">Monthly Scheduled Baseline</div>
-            <div style="font-size: 34px; font-weight: 900; color: #d97706; line-height: 1.1;">
-                {month_sched_energy:.1f} <span style="font-size: 16px; font-weight: 700; color: #64748b;">kWh</span>
-            </div>
-            <div class="metric-sub-unit">Uncontrolled baseline</div>
-        </div>
-        <div style="border-left: 2px solid #cbd5e1; height: 60px;"></div>
-        <div>
-            <div class="metric-label-muted" style="color: #16a34a;">Cumulative Monthly Savings</div>
-            <div style="font-size: 40px; font-weight: 900; color: #16a34a; line-height: 1.1;">
-                -{month_saved_energy:.1f} <span style="font-size: 16px; font-weight: 700; color: #15803d;">kWh</span>
-            </div>
-            <div style="font-size: 16px; font-weight: 800; color: #15803d;">{month_pct_saved:.1f}% Energy Reduction</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
 st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
 
-# --- 8. MAIN BODY: 2-COLUMN BALANCED GRAPH SECTION (NO TEMP GRAPH & NO SENSOR TABLE) ---
+# --- 7. MAIN BODY: 2-COLUMN BALANCED GRAPH SECTION ---
 grid_left, grid_right = st.columns([1.0, 1.0])
 
 # Left: Occupancy Tracking & 15 Minute Ahead Forecast
