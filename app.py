@@ -322,7 +322,6 @@ if is_live_mode:
         st.markdown(f"<div style='font-size: 16px; font-weight: 800; padding-top: 6px; color: #2563eb;'>⏱️ Real-Time: <b>{active_time.strftime('%H:%M:%S')} ({tz_abbr})</b></div>", unsafe_allow_html=True)
 else:
     with c_date:
-        # Strictly weekdays in the date selector dropdown
         date_options = [d.strftime('%a, %d %b %Y') for d in business_dates]
         default_str = csv_default_date.strftime('%a, %d %b %Y')
         default_idx = date_options.index(default_str) if default_str in date_options else len(date_options)-1
@@ -378,8 +377,6 @@ outdoor_temp = df_live['outdoor_temperature_C'].iloc[-1]
 setpoint_temp = 24.0
 
 cur_power = df_live['predictive_hvac_power_kW'].iloc[-1]
-is_cooling = cur_power > 0.05
-hvac_on = cur_power > 0.0
 
 # --- DAILY ENERGY CALCULATIONS (FROM 08:00 AM) ---
 df_day['pred_kwh_interval'] = df_day['predictive_hvac_power_kW'] * (5.0 / 60.0)
@@ -551,7 +548,7 @@ with kpi_col3:
     </div>
     """, unsafe_allow_html=True)
 
-# 4. Standalone Current Power Card
+# 4. Standalone Current Power Card (Clean display without compressor status)
 with kpi_col4:
     st.markdown(f"""
     <div class="metric-card-box">
@@ -563,10 +560,7 @@ with kpi_col4:
             </div>
             <div class="metric-sub-unit">kW active load</div>
         </div>
-        <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 800; color: {'#16a34a' if is_cooling else '#64748b'};">
-            <span class="circle-dot {'circle-green' if is_cooling else 'circle-gray'}" style="height: 10px; width: 10px;"></span>
-            <span>{'Compressor Running' if is_cooling else 'Compressor Idle'}</span>
-        </div>
+        <div style="height: 4px;"></div>
     </div>
     """, unsafe_allow_html=True)
 
