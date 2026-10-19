@@ -13,7 +13,7 @@ try:
 except Exception:
     pass
 
-# --- 1. PAGE CONFIGURATION & THEME CSS ---
+# --- 1. PAGE CONFIGURATION & CLEAN MODERN CSS ---
 st.set_page_config(
     page_title="Innovation Lab – HVAC Monitoring",
     layout="wide",
@@ -22,8 +22,8 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* Clean, high-contrast light background matching the deployed dashboard */
-    .stApp {
+    /* 1. Base App & Root Canvas: Crisp Light Modern Theme (Matches Display) */
+    .stApp, [data-testid="stAppViewContainer"], .main {
         background-color: #f8fafc !important;
         color: #0f172a !important;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -34,28 +34,28 @@ st.markdown("""
     }
     
     .main .block-container {
-        padding-top: 1.0rem;
-        padding-bottom: 5rem;
+        padding-top: 1.2rem;
+        padding-bottom: 6rem;
         max-width: 98%;
     }
     
-    /* Search Toolbar */
+    /* 2. Search Toolbar */
     .filter-toolbar {
-        background-color: #ffffff;
-        border: 1.5px solid #cbd5e1;
+        background-color: #ffffff !important;
+        border: 1.5px solid #e2e8f0 !important;
         border-radius: 14px;
         padding: 12px 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        margin-bottom: 22px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
     }
     
-    /* Responsive Aligned Square Metric Cards */
+    /* 3. Metric Cards */
     .metric-card-box {
-        background-color: #ffffff;
-        border: 1.5px solid #cbd5e1;
+        background-color: #ffffff !important;
+        border: 1.5px solid #e2e8f0 !important;
         border-radius: 18px;
         padding: 18px 20px;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
         min-height: 205px;
         height: auto;
         display: flex;
@@ -67,7 +67,7 @@ st.markdown("""
     .card-top-title {
         font-size: 18px;
         font-weight: 800;
-        color: #1e293b;
+        color: #1e293b !important;
         display: flex;
         align-items: center;
         gap: 8px;
@@ -78,7 +78,7 @@ st.markdown("""
     .metric-main-val {
         font-size: clamp(32px, 3.0vw, 44px);
         font-weight: 900;
-        color: #0f172a;
+        color: #0f172a !important;
         line-height: 1.05;
         margin: 4px 0 2px 0;
     }
@@ -86,7 +86,7 @@ st.markdown("""
     .metric-label-muted {
         font-size: 13.5px;
         font-weight: 800;
-        color: #64748b;
+        color: #64748b !important;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
@@ -94,33 +94,30 @@ st.markdown("""
     .metric-sub-unit {
         font-size: 13px;
         font-weight: 700;
-        color: #64748b;
+        color: #64748b !important;
     }
 
-    /* Distinct Temperature Compartment Boundary Box */
+    /* Distinct Compartment Boxes for Temperature Display */
     .temp-compartment {
         flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        padding: 8px 4px;
-        border-radius: 10px;
         background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px 6px;
+        text-align: center;
+        transition: all 0.2s ease;
     }
-    
     .temp-divider {
         width: 2px;
-        height: 64px;
         background-color: #cbd5e1;
+        height: 64px;
         margin: 0 6px;
+        align-self: center;
     }
 
-    /* Thermal Comfort Hero Badge */
+    /* 4. Thermal Comfort Badge */
     .comfort-card-box {
         background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-        color: #ffffff;
         border-radius: 18px;
         padding: 16px;
         display: flex;
@@ -130,16 +127,16 @@ st.markdown("""
         text-align: center;
         min-height: 205px;
         height: auto;
-        box-shadow: 0 6px 24px rgba(22, 163, 74, 0.35);
+        box-shadow: 0 4px 18px rgba(22, 163, 74, 0.35);
         animation: comfortPulse 3s infinite ease-in-out;
         box-sizing: border-box;
     }
     @keyframes comfortPulse {
-        0%, 100% { box-shadow: 0 0 16px rgba(22, 163, 74, 0.25); }
-        50% { box-shadow: 0 0 32px rgba(22, 163, 74, 0.55); }
+        0%, 100% { box-shadow: 0 0 12px rgba(22, 163, 74, 0.25); }
+        50% { box-shadow: 0 0 26px rgba(22, 163, 74, 0.55); }
     }
     
-    /* Enlarged Radial Circular Ring Gauge Styling */
+    /* 5. Radial Saving Ring Gauge */
     .gauge-container {
         display: flex;
         align-items: center;
@@ -149,8 +146,8 @@ st.markdown("""
     }
     .circular-gauge {
         position: relative;
-        width: 148px;
-        height: 148px;
+        width: 144px;
+        height: 144px;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -159,15 +156,15 @@ st.markdown("""
     }
     .circular-gauge-inner {
         position: absolute;
-        width: 114px;
-        height: 114px;
-        background: #ffffff;
+        width: 110px;
+        height: 110px;
+        background: #ffffff !important;
         border-radius: 50%;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.06);
+        box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.06);
     }
     
     .circle-dot {
@@ -318,7 +315,7 @@ with col_head_mid:
 with col_head_right:
     st.selectbox("Select Zone:", ["Zone: Innovation Lab", "Zone: Meeting Room", "Zone: Open Workspace"], label_visibility="collapsed")
 
-# --- 5. SEARCHABLE DATE & TIME CONTROL TOOLBAR (WEEKDAYS ONLY) ---
+# --- 5. SEARCHABLE DATE & TIME CONTROL TOOLBAR ---
 st.markdown("<div class='filter-toolbar'>", unsafe_allow_html=True)
 c_mode, c_date, c_time, c_track = st.columns([1.0, 1.3, 1.7, 1.2])
 
@@ -458,7 +455,7 @@ else:
 month_pct_saved = (month_cum_saved / month_cum_sched * 100) if month_cum_sched > 0 else 0.0
 
 if energy_view_mode == "Monthly Cumulative (Mon-Fri)":
-    card_title = f"📊 Monthly Cumulative Energy ({month_name}, Mon–Fri)"
+    card_title = f"📊 Monthly Cumulative Energy ({month_name})"
     disp_pred = month_cum_pred
     disp_sched = month_cum_sched
     disp_saved = month_cum_saved
@@ -473,20 +470,20 @@ else:
 gauge_pct = min(100.0, max(0.0, disp_pct))
 gauge_deg = int((gauge_pct / 100.0) * 360)
 
-# --- 6. TOP SUMMARY SECTION (4 BALANCED CARDS, CURRENT POWER REMOVED) ---
-# Columns: Occupancy (0.95), Temperature (1.35), Comfort (0.85), Energy Usage (1.85)
-kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([0.95, 1.35, 0.85, 1.85])
+# --- 6. RESTRUCTURED TOP SUMMARY SECTION (4 BALANCED CARDS, CURRENT POWER REMOVED) ---
+# Column ratio: Occupancy (1.0), Temperature (1.45), Thermal Comfort (0.85), Energy Usage (2.1)
+kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1.0, 1.45, 0.85, 2.1])
 
 # 1. Occupancy Card
 if pred_occ > cur_occ:
     trend_symbol = "↑"
-    trend_color = "#dc2626"
+    trend_color = "#dc2626"  # Red for rise
 elif pred_occ < cur_occ:
     trend_symbol = "↓"
-    trend_color = "#16a34a"
+    trend_color = "#16a34a"  # Green for drop
 else:
     trend_symbol = "="
-    trend_color = "#2563eb"
+    trend_color = "#2563eb"  # Blue for equal
 
 with kpi_col1:
     st.markdown(f"""
@@ -498,7 +495,7 @@ with kpi_col1:
                 <div class="metric-main-val">{cur_occ}</div>
                 <div class="metric-sub-unit">people</div>
             </div>
-            <div style="border-left: 2px solid #cbd5e1; height: 68px;"></div>
+            <div style="border-left: 1.5px solid #e2e8f0; height: 68px;"></div>
             <div>
                 <div class="metric-label-muted">15 min ahead</div>
                 <div class="metric-main-val">
@@ -514,28 +511,28 @@ with kpi_col1:
     </div>
     """, unsafe_allow_html=True)
 
-# 2. Temperature Card WITH PROMINENT CLEAR BOUNDARIES
+# 2. Temperature Card with Clear Distinct Compartments & Visible Boundaries
 with kpi_col2:
     st.markdown(f"""
     <div class="metric-card-box">
         <div class="card-top-title">🌡️ Temperature (°C)</div>
-        <div style="display: flex; justify-content: space-between; align-items: center; text-align: center; margin: auto 0; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: auto 0;">
             <div class="temp-compartment">
-                <div class="metric-label-muted" style="color: #0284c7;">Zone</div>
-                <div class="metric-main-val" style="font-size: clamp(30px, 2.7vw, 42px); color: #0f172a;">{zone_temp:.1f}</div>
-                <div class="metric-sub-unit">actual</div>
+                <div class="metric-label-muted" style="font-size: 12.5px;">Zone</div>
+                <div class="metric-main-val" style="color: #0284c7; font-size: 34px;">{zone_temp:.1f}</div>
+                <div class="metric-sub-unit" style="font-size: 11.5px;">°C Actual</div>
             </div>
             <div class="temp-divider"></div>
             <div class="temp-compartment">
-                <div class="metric-label-muted" style="color: #16a34a;">Setpoint</div>
-                <div class="metric-main-val" style="font-size: clamp(30px, 2.7vw, 42px); color: #0f172a;">{setpoint_temp:.1f}</div>
-                <div class="metric-sub-unit">target</div>
+                <div class="metric-label-muted" style="font-size: 12.5px;">Setpoint</div>
+                <div class="metric-main-val" style="color: #16a34a; font-size: 34px;">{setpoint_temp:.1f}</div>
+                <div class="metric-sub-unit" style="font-size: 11.5px;">°C Target</div>
             </div>
             <div class="temp-divider"></div>
             <div class="temp-compartment">
-                <div class="metric-label-muted" style="color: #ea580c;">Outdoor</div>
-                <div class="metric-main-val" style="font-size: clamp(30px, 2.7vw, 42px); color: #0f172a;">{outdoor_temp:.1f}</div>
-                <div class="metric-sub-unit">ambient</div>
+                <div class="metric-label-muted" style="font-size: 12.5px;">Outdoor</div>
+                <div class="metric-main-val" style="color: #ea580c; font-size: 34px;">{outdoor_temp:.1f}</div>
+                <div class="metric-sub-unit" style="font-size: 11.5px;">°C Ambient</div>
             </div>
         </div>
         <div style="height: 4px;"></div>
@@ -554,41 +551,40 @@ with kpi_col3:
             {comfort_icon}
         </div>
         <div>
-            <div style="font-size: 12.5px; font-weight: 800; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.5px;">
+            <div style="font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.5px;">
                 Thermal Comfort
             </div>
-            <div style="font-size: 21px; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2;">
+            <div style="font-size: 20px; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; color: #ffffff;">
                 {comfort_label}
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# 4. Energy Usage Summary Card (Generously Sized across available space)
+# 4. Expanded & Spacious Energy Usage Summary Card (Side-by-Side & Large Radial Gauge)
 with kpi_col4:
     st.markdown(f"""
     <div class="metric-card-box">
         <div class="card-top-title">{card_title}</div>
         <div class="gauge-container" style="padding: 0 8px;">
-            <!-- Side-by-side values with vertical separator -->
-            <div style="display: flex; align-items: center; justify-content: space-around; flex: 1; text-align: center; gap: 16px;">
-                <div style="flex: 1;">
-                    <div class="metric-label-muted" style="font-size: 12px; color: #2563eb;">Predictive HVAC</div>
-                    <div style="font-size: clamp(30px, 2.7vw, 42px); font-weight: 900; color: #2563eb; line-height: 1.1; margin-top: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-around; flex: 1; text-align: center; gap: 20px;">
+                <div style="background-color: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; flex: 1;">
+                    <div class="metric-label-muted" style="font-size: 12.5px;">Predictive HVAC</div>
+                    <div style="font-size: 34px; font-weight: 900; color: #2563eb; line-height: 1.1; margin-top: 4px;">
                         {disp_pred:.2f}
                     </div>
-                    <div class="metric-sub-unit" style="font-size: 13px; font-weight: 800;">kWh</div>
+                    <div class="metric-sub-unit" style="font-size: 13px; font-weight: 800;">kWh consumed</div>
                 </div>
-                <div style="border-left: 2px solid #cbd5e1; height: 68px;"></div>
-                <div style="flex: 1;">
-                    <div class="metric-label-muted" style="font-size: 12px; color: #d97706;">Scheduled Baseline</div>
-                    <div style="font-size: clamp(30px, 2.7vw, 42px); font-weight: 900; color: #d97706; line-height: 1.1; margin-top: 4px;">
+                <div style="border-left: 2px solid #cbd5e1; height: 72px;"></div>
+                <div style="background-color: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; flex: 1;">
+                    <div class="metric-label-muted" style="font-size: 12.5px;">Scheduled Baseline</div>
+                    <div style="font-size: 34px; font-weight: 900; color: #d97706; line-height: 1.1; margin-top: 4px;">
                         {disp_sched:.2f}
                     </div>
-                    <div class="metric-sub-unit" style="font-size: 13px; font-weight: 800;">kWh</div>
+                    <div class="metric-sub-unit" style="font-size: 13px; font-weight: 800;">kWh baseline</div>
                 </div>
             </div>
-            <!-- Enlarged Circular Radial Progress Ring Gauge -->
+            <!-- Large Prominent Radial Savings Ring Gauge -->
             <div class="circular-gauge" style="background: conic-gradient(#16a34a 0deg {gauge_deg}deg, #e2e8f0 {gauge_deg}deg 360deg);">
                 <div class="circular-gauge-inner">
                     <div style="font-size: 11px; font-weight: 900; color: #16a34a; text-transform: uppercase; letter-spacing: 0.8px;">SAVING</div>
@@ -605,6 +601,10 @@ st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
 # --- 7. MAIN BODY: 2-COLUMN BALANCED GRAPH SECTION ---
 grid_left, grid_right = st.columns([1.0, 1.0])
 
+CHART_BG = "#ffffff"
+GRID_COLOR = "#f1f5f9"
+TEXT_COLOR = "#334155"
+
 # Left Column: Occupancy Tracking & 15 Minute Ahead Forecast
 with grid_left:
     st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>👥 Occupancy Tracking & 15 Minute Ahead Forecast</div>", unsafe_allow_html=True)
@@ -616,7 +616,7 @@ with grid_left:
     fig_occ = go.Figure()
     fig_occ.add_trace(go.Scatter(
         x=df_live.index, y=df_live['occupancy_forecast_15min'],
-        mode='lines', name='15 Minute Ahead Forecast',
+        mode='lines', name='15 Min Forecast',
         line=dict(color='#f97316', width=3.5, dash='dash')
     ))
     fig_occ.add_trace(go.Scatter(
@@ -624,23 +624,23 @@ with grid_left:
         mode='lines', name='Actual Occupancy',
         line=dict(color='#0284c7', width=4)
     ))
-    fig_occ.add_vline(x=datetime.combine(active_date, active_time), line_width=2.5, line_color="#ef4444")
+    fig_occ.add_vline(x=datetime.combine(active_date, active_time), line_width=2, line_color="#ef4444")
 
     fig_occ.update_layout(
         height=430,
         margin=dict(l=25, r=25, t=10, b=25),
         xaxis_title="", yaxis_title="People",
-        plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-        font=dict(color="#334155", size=14),
-        xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[t_start, t_end]),
-        yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[0, y_upper], dtick=1),
+        plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
+        font=dict(color=TEXT_COLOR, size=14),
+        xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=13, color=TEXT_COLOR), range=[t_start, t_end]),
+        yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=13, color=TEXT_COLOR), range=[0, y_upper], dtick=1),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
             x=1,
-            font=dict(size=13, color="#1e293b"),
+            font=dict(size=13, color=TEXT_COLOR),
             bgcolor="rgba(255, 255, 255, 0.9)",
             bordercolor="#e2e8f0",
             borderwidth=1
@@ -648,7 +648,7 @@ with grid_left:
     )
     st.plotly_chart(fig_occ, use_container_width=True)
 
-# Right Column: Energy Graph (Switches between Daily Profile and Monthly Cumulative Progression)
+# Right Column: Energy Graph
 with grid_right:
     if energy_view_mode == "Monthly Cumulative (Mon-Fri)":
         st.markdown(f"<div class='card-top-title' style='margin-bottom: 12px;'>📊 Monthly Cumulative Energy Progression ({month_name}, Mon–Fri)</div>", unsafe_allow_html=True)
@@ -673,10 +673,9 @@ with grid_right:
             marker=dict(size=6)
         ))
 
-        # Mark active date
         active_label = active_date.strftime('%a %d %b')
         if active_label in dates_list:
-            fig_energy.add_vline(x=active_label, line_width=2.5, line_color="#ef4444")
+            fig_energy.add_vline(x=active_label, line_width=2, line_color="#ef4444")
 
         y_max = daily_summary['sched_kwh_cum'].max() * 1.1 if not daily_summary.empty else 10.0
 
@@ -685,17 +684,17 @@ with grid_right:
             margin=dict(l=25, r=25, t=10, b=25),
             xaxis_title="Business Day (08:00 AM - 06:00 PM)", 
             yaxis_title="Cumulative Energy (kWh)",
-            plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-            font=dict(color="#334155", size=14),
-            xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=12)),
-            yaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[0.0, y_max], zeroline=False),
+            plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
+            font=dict(color=TEXT_COLOR, size=14),
+            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR)),
+            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=13, color=TEXT_COLOR), range=[0.0, y_max], zeroline=False),
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
                 y=1.02,
                 xanchor="right",
                 x=1,
-                font=dict(size=12, color="#1e293b"),
+                font=dict(size=12, color=TEXT_COLOR),
                 bgcolor="rgba(255, 255, 255, 0.9)",
                 bordercolor="#e2e8f0",
                 borderwidth=1
@@ -703,41 +702,25 @@ with grid_right:
         )
         st.plotly_chart(fig_energy, use_container_width=True)
     else:
-        st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Daily Energy Profile: Power Demand & Cumulative Energy (kWh)</div>", unsafe_allow_html=True)
+        st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Daily Energy Profile: Cumulative Energy (kWh)</div>", unsafe_allow_html=True)
         fig_energy = go.Figure()
         
         df_live_plot = df_live[df_live.index >= t_start]
         
-        # 1. Non-Cumulative Power Demand (Left Y-Axis, kW)
-        fig_energy.add_trace(go.Scatter(
-            x=df_live_plot.index, y=df_live_plot['scheduled_hvac_power_kW'],
-            mode='lines', name='Baseline Power (kW)',
-            line=dict(color='#fdba74', width=2, dash='dot'),
-            yaxis='y'
-        ))
-        fig_energy.add_trace(go.Scatter(
-            x=df_live_plot.index, y=df_live_plot['predictive_hvac_power_kW'],
-            mode='lines', name='Predictive Power (kW)',
-            line=dict(color='#7dd3fc', width=2.5),
-            fill='tozeroy', fillcolor='rgba(125, 211, 252, 0.15)',
-            yaxis='y'
-        ))
-        
-        # 2. Cumulative Energy Consumed Since 08:00 AM (Right Y-Axis, kWh)
+        # Cumulative Energy Consumed Since 08:00 AM (Single Y-Axis, kWh)
         fig_energy.add_trace(go.Scatter(
             x=df_live_plot.index, y=df_live_plot['sched_energy_cum_day'],
             mode='lines', name='Baseline Cumulative (kWh)',
-            line=dict(color='#ea580c', width=3.5, dash='dash'),
-            yaxis='y2'
+            line=dict(color='#ea580c', width=3.5, dash='dash')
         ))
         fig_energy.add_trace(go.Scatter(
             x=df_live_plot.index, y=df_live_plot['pred_energy_cum_day'],
             mode='lines', name='Predictive Cumulative (kWh)',
             line=dict(color='#0284c7', width=4),
-            yaxis='y2'
+            fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.10)'
         ))
         
-        fig_energy.add_vline(x=datetime.combine(active_date, active_time), line_width=2.5, line_color="#ef4444")
+        fig_energy.add_vline(x=datetime.combine(active_date, active_time), line_width=2, line_color="#ef4444")
         
         max_cum_e = day_window_data['sched_energy_cum_day'].max() if not day_window_data.empty else 5.0
         y_energy_cum_upper = max(2.0, round(float(max_cum_e) + 0.6, 1))
@@ -746,23 +729,14 @@ with grid_right:
             height=430,
             margin=dict(l=25, r=25, t=10, b=25),
             xaxis_title="", 
-            plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
-            font=dict(color="#334155", size=14),
-            xaxis=dict(showgrid=True, gridcolor="#f1f5f9", tickfont=dict(size=13), range=[t_start, t_end]),
+            plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
+            font=dict(color=TEXT_COLOR, size=14),
+            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=13, color=TEXT_COLOR), range=[t_start, t_end]),
             yaxis=dict(
-                title="Power Demand (kW)",
-                showgrid=True, 
-                gridcolor="#f1f5f9", 
-                tickfont=dict(size=13, color='#0284c7'),
-                range=[0.0, 2.2],
-                zeroline=False
-            ),
-            yaxis2=dict(
                 title="Cumulative Energy (kWh)",
-                overlaying='y',
-                side='right',
-                showgrid=False,
-                tickfont=dict(size=13, color='#ea580c'),
+                showgrid=True, 
+                gridcolor=GRID_COLOR, 
+                tickfont=dict(size=13, color=TEXT_COLOR),
                 range=[0.0, y_energy_cum_upper],
                 zeroline=False
             ),
@@ -772,7 +746,7 @@ with grid_right:
                 y=1.02,
                 xanchor="right",
                 x=1,
-                font=dict(size=12, color="#1e293b"),
+                font=dict(size=12, color=TEXT_COLOR),
                 bgcolor="rgba(255, 255, 255, 0.9)",
                 bordercolor="#e2e8f0",
                 borderwidth=1
