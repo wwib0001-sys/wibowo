@@ -598,16 +598,16 @@ with kpi_col4:
 
 st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
 
-# --- 7. MAIN BODY: 2-COLUMN BALANCED GRAPH SECTION ---
-grid_left, grid_right = st.columns([1.0, 1.0])
+# --- 7. MAIN BODY: 3-COLUMN BALANCED GRAPH SECTION (OCCUPANCY | TEMPERATURE | ENERGY) ---
+grid_left, grid_mid, grid_right = st.columns([1.0, 1.0, 1.0])
 
 CHART_BG = "#ffffff"
 GRID_COLOR = "#f1f5f9"
 TEXT_COLOR = "#334155"
 
-# Left Column: Occupancy Tracking & 15 Minute Ahead Forecast
+# 1. Left Column: Occupancy Tracking & 15 Minute Ahead Forecast
 with grid_left:
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>👥 Occupancy Tracking & 15 Minute Ahead Forecast</div>", unsafe_allow_html=True)
+    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>👥 Occupancy Tracking & 15 Min Forecast</div>", unsafe_allow_html=True)
     
     day_window_data = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
     max_occ_day = max(day_window_data['occupancy_now'].max(), day_window_data['occupancy_forecast_15min'].max())
@@ -617,12 +617,12 @@ with grid_left:
     fig_occ.add_trace(go.Scatter(
         x=df_live.index, y=df_live['occupancy_forecast_15min'],
         mode='lines', name='15 Min Forecast',
-        line=dict(color='#f97316', width=3.5, dash='dash')
+        line=dict(color='#f97316', width=3, dash='dash')
     ))
     fig_occ.add_trace(go.Scatter(
         x=df_live.index, y=df_live['occupancy_now'],
         mode='lines', name='Actual Occupancy',
-        line=dict(color='#0284c7', width=4)
+        line=dict(color='#0284c7', width=3.5)
     ))
     fig_occ.add_vline(x=datetime.combine(active_date, active_time), line_width=2, line_color="#ef4444")
 
@@ -631,16 +631,16 @@ with grid_left:
         margin=dict(l=25, r=25, t=10, b=25),
         xaxis_title="", yaxis_title="People",
         plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
-        font=dict(color=TEXT_COLOR, size=14),
-        xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=13, color=TEXT_COLOR), range=[t_start, t_end]),
-        yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=13, color=TEXT_COLOR), range=[0, y_upper], dtick=1),
+        font=dict(color=TEXT_COLOR, size=13),
+        xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[t_start, t_end]),
+        yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[0, y_upper], dtick=1),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
             x=1,
-            font=dict(size=13, color=TEXT_COLOR),
+            font=dict(size=11, color=TEXT_COLOR),
             bgcolor="rgba(255, 255, 255, 0.9)",
             bordercolor="#e2e8f0",
             borderwidth=1
@@ -648,10 +648,67 @@ with grid_left:
     )
     st.plotly_chart(fig_occ, use_container_width=True)
 
-# Right Column: Energy Graph
+# 2. Middle Column: Temperature Trend Curve (°C)
+with grid_mid:
+    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend (°C)</div>", unsafe_allow_html=True)
+    fig_temp = go.Figure()
+    
+    # Comfort band shading (22.8 - 25.8 °C)
+    fig_temp.add_hrect(
+        y0=22.8, y1=25.8, line_width=0, fillcolor="#22c55e", opacity=0.16,
+        annotation_text="Comfort (22.8 - 25.8°C)", annotation_position="top right", annotation_font_size=11, annotation_font_color="#166534"
+    )
+    # Setpoint (24.0 °C)
+    fig_temp.add_hline(
+        y=24.0, line_dash="dash", line_color="#10b981", line_width=2, 
+        annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=11, annotation_font_color="#047857"
+    )
+    # Zone Temperature
+    fig_temp.add_trace(go.Scatter(
+        x=df_live.index, y=df_live['predictive_room_temperature_C'],
+        mode='lines', name='Zone Temp',
+        line=dict(color='#0284c7', width=3.5)
+    ))
+    # Outdoor Temperature
+    fig_temp.add_trace(go.Scatter(
+        x=df_live.index, y=df_live['outdoor_temperature_C'],
+        mode='lines', name='Outdoor Temp',
+        line=dict(color='#ea580c', width=2.5, dash='dot')
+    ))
+    fig_temp.add_vline(x=datetime.combine(active_date, active_time), line_width=2, line_color="#ef4444")
+
+    fig_temp.update_layout(
+        height=430,
+        margin=dict(l=25, r=25, t=10, b=25),
+        xaxis_title="", yaxis_title="Temperature (°C)",
+        plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
+        font=dict(color=TEXT_COLOR, size=13),
+        xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[t_start, t_end]),
+        yaxis=dict(
+            showgrid=True, 
+            gridcolor=GRID_COLOR, 
+            tickfont=dict(size=12, color=TEXT_COLOR),
+            range=[22.0, 34.0],
+            dtick=2.0
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            font=dict(size=11, color=TEXT_COLOR),
+            bgcolor="rgba(255, 255, 255, 0.9)",
+            bordercolor="#e2e8f0",
+            borderwidth=1
+        )
+    )
+    st.plotly_chart(fig_temp, use_container_width=True)
+
+# 3. Right Column: Energy Graph
 with grid_right:
     if energy_view_mode == "Monthly Cumulative (Mon-Fri)":
-        st.markdown(f"<div class='card-top-title' style='margin-bottom: 12px;'>📊 Monthly Cumulative Energy Progression ({month_name}, Mon–Fri)</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='card-top-title' style='margin-bottom: 12px;'>📊 Monthly Cumulative ({month_name})</div>", unsafe_allow_html=True)
         fig_energy = go.Figure()
 
         dates_list = [d.strftime('%a %d %b') for d in daily_summary.index]
@@ -659,18 +716,18 @@ with grid_right:
         # Scheduled Baseline Cumulative (Business Days Only)
         fig_energy.add_trace(go.Scatter(
             x=dates_list, y=daily_summary['sched_kwh_cum'],
-            mode='lines+markers', name='Baseline Cumulative (kWh)',
-            line=dict(color='#ea580c', width=3.5, dash='dash'),
-            marker=dict(size=6)
+            mode='lines+markers', name='Baseline Cumulative',
+            line=dict(color='#ea580c', width=3, dash='dash'),
+            marker=dict(size=5)
         ))
         
         # Predictive HVAC Cumulative (Business Days Only)
         fig_energy.add_trace(go.Scatter(
             x=dates_list, y=daily_summary['pred_kwh_cum'],
-            mode='lines+markers', name='Predictive Cumulative (kWh)',
-            line=dict(color='#0284c7', width=4),
+            mode='lines+markers', name='Predictive Cumulative',
+            line=dict(color='#0284c7', width=3.5),
             fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.12)',
-            marker=dict(size=6)
+            marker=dict(size=5)
         ))
 
         active_label = active_date.strftime('%a %d %b')
@@ -682,19 +739,19 @@ with grid_right:
         fig_energy.update_layout(
             height=430,
             margin=dict(l=25, r=25, t=10, b=25),
-            xaxis_title="Business Day (08:00 AM - 06:00 PM)", 
+            xaxis_title="", 
             yaxis_title="Cumulative Energy (kWh)",
             plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
-            font=dict(color=TEXT_COLOR, size=14),
+            font=dict(color=TEXT_COLOR, size=13),
             xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR)),
-            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=13, color=TEXT_COLOR), range=[0.0, y_max], zeroline=False),
+            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[0.0, y_max], zeroline=False),
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
                 y=1.02,
                 xanchor="right",
                 x=1,
-                font=dict(size=12, color=TEXT_COLOR),
+                font=dict(size=11, color=TEXT_COLOR),
                 bgcolor="rgba(255, 255, 255, 0.9)",
                 bordercolor="#e2e8f0",
                 borderwidth=1
@@ -702,7 +759,7 @@ with grid_right:
         )
         st.plotly_chart(fig_energy, use_container_width=True)
     else:
-        st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Daily Energy Profile: Cumulative Energy (kWh)</div>", unsafe_allow_html=True)
+        st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Daily Energy: Cumulative (kWh)</div>", unsafe_allow_html=True)
         fig_energy = go.Figure()
         
         df_live_plot = df_live[df_live.index >= t_start]
@@ -710,13 +767,13 @@ with grid_right:
         # Cumulative Energy Consumed Since 08:00 AM (Single Y-Axis, kWh)
         fig_energy.add_trace(go.Scatter(
             x=df_live_plot.index, y=df_live_plot['sched_energy_cum_day'],
-            mode='lines', name='Baseline Cumulative (kWh)',
-            line=dict(color='#ea580c', width=3.5, dash='dash')
+            mode='lines', name='Baseline Cumulative',
+            line=dict(color='#ea580c', width=3, dash='dash')
         ))
         fig_energy.add_trace(go.Scatter(
             x=df_live_plot.index, y=df_live_plot['pred_energy_cum_day'],
-            mode='lines', name='Predictive Cumulative (kWh)',
-            line=dict(color='#0284c7', width=4),
+            mode='lines', name='Predictive Cumulative',
+            line=dict(color='#0284c7', width=3.5),
             fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.10)'
         ))
         
@@ -730,13 +787,13 @@ with grid_right:
             margin=dict(l=25, r=25, t=10, b=25),
             xaxis_title="", 
             plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
-            font=dict(color=TEXT_COLOR, size=14),
-            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=13, color=TEXT_COLOR), range=[t_start, t_end]),
+            font=dict(color=TEXT_COLOR, size=13),
+            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[t_start, t_end]),
             yaxis=dict(
                 title="Cumulative Energy (kWh)",
                 showgrid=True, 
                 gridcolor=GRID_COLOR, 
-                tickfont=dict(size=13, color=TEXT_COLOR),
+                tickfont=dict(size=12, color=TEXT_COLOR),
                 range=[0.0, y_energy_cum_upper],
                 zeroline=False
             ),
@@ -746,7 +803,7 @@ with grid_right:
                 y=1.02,
                 xanchor="right",
                 x=1,
-                font=dict(size=12, color=TEXT_COLOR),
+                font=dict(size=11, color=TEXT_COLOR),
                 bgcolor="rgba(255, 255, 255, 0.9)",
                 bordercolor="#e2e8f0",
                 borderwidth=1
