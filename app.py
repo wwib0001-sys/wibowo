@@ -13,7 +13,7 @@ try:
 except Exception:
     pass
 
-# --- 1. PAGE CONFIGURATION & CLEAN LIGHT THEME CSS ---
+# --- 1. PAGE CONFIGURATION & CLEAN THEME CSS ---
 st.set_page_config(
     page_title="Innovation Lab – HVAC Monitoring",
     layout="wide",
@@ -22,7 +22,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* 1. Base App & Canvas: Crisp Clean Light Theme */
+    /* 1. Base App & Canvas: Crisp Clean Theme */
     .stApp, [data-testid="stAppViewContainer"], .main {
         background-color: #f8fafc !important;
         color: #0f172a !important;
@@ -79,7 +79,7 @@ st.markdown("""
         font-size: 17px;
         font-weight: 800;
         color: #1e293b !important;
-        margin-top: 8px;
+        margin-top: 12px;
         margin-bottom: 8px;
         display: flex;
         align-items: center;
@@ -493,7 +493,7 @@ max_occ_day = max(day_window_data['occupancy_now'].max(), day_window_data['occup
 y_upper = max(8, int(max_occ_day) + 2) if pd.notna(max_occ_day) else 8
 
 # ==============================================================================
-# --- TOP SUMMARY ROW: 5 CLEAN LIGHT CARDS (INCL. CURRENT POWER) ---
+# --- TOP SUMMARY ROW: 5 BALANCED CLEAN CARDS (INCL. CURRENT POWER) ---
 # ==============================================================================
 kpi_col1, kpi_col2, kpi_col3, kpi_col4, kpi_col5 = st.columns([0.95, 1.35, 0.85, 0.95, 1.65])
 
@@ -639,7 +639,7 @@ with kpi_col5:
 st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
 # ==============================================================================
-# --- 4 FULL-WIDTH STACKED GRAPHS ---
+# --- 3 FULL-WIDTH STACKED GRAPHS (OCCUPANCY | TEMPERATURE | COMBINED ENERGY & POWER) ---
 # ==============================================================================
 
 # --- GRAPH 1: OCCUPANCY TRACKING & 15 MIN FORECAST ---
@@ -739,58 +739,7 @@ st.plotly_chart(fig_temp, use_container_width=True)
 
 st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
 
-# --- GRAPH 3: POWER DEMAND PROFILE (KW) ---
-st.markdown("<div class='graph-section-title'>⚡ Power Demand Profile (kW)</div>", unsafe_allow_html=True)
-fig_pwr = go.Figure()
-
-df_live_plot = df_live[df_live.index >= t_start]
-
-# Baseline Power (kW)
-fig_pwr.add_trace(go.Scatter(
-    x=df_live_plot.index, y=df_live_plot['scheduled_hvac_power_kW'],
-    mode='lines', name='Baseline Power (kW)',
-    line=dict(color='#fdba74', width=2.2, dash='dot')
-))
-# Predictive HVAC Power (kW)
-fig_pwr.add_trace(go.Scatter(
-    x=df_live_plot.index, y=df_live_plot['predictive_hvac_power_kW'],
-    mode='lines', name='Predictive Power (kW)',
-    line=dict(color='#0284c7', width=2.8),
-    fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.12)'
-))
-fig_pwr.add_vline(x=datetime.combine(active_date, active_time), line_width=2, line_color="#ef4444")
-
-fig_pwr.update_layout(
-    height=CHART_HEIGHT,
-    margin=dict(l=25, r=25, t=10, b=20),
-    xaxis_title="", yaxis_title="Power Demand (kW)",
-    plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
-    font=dict(color=TEXT_COLOR, size=12),
-    xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=11, color=TEXT_COLOR), range=[t_start, t_end]),
-    yaxis=dict(
-        showgrid=True, 
-        gridcolor=GRID_COLOR, 
-        tickfont=dict(size=11, color=TEXT_COLOR),
-        range=[0.0, 2.0],
-        dtick=0.5
-    ),
-    legend=dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.02,
-        xanchor="right",
-        x=1,
-        font=dict(size=11, color=TEXT_COLOR),
-        bgcolor="rgba(255, 255, 255, 0.9)",
-        bordercolor="#e2e8f0",
-        borderwidth=1
-    )
-)
-st.plotly_chart(fig_pwr, use_container_width=True)
-
-st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
-
-# --- GRAPH 4: DAILY ENERGY CUMULATIVE (KWH) ---
+# --- GRAPH 3: COMBINED DAILY ENERGY & POWER DEMAND PROFILE ---
 if energy_view_mode == "Monthly Cumulative (Mon-Fri)":
     st.markdown(f"<div class='graph-section-title'>📊 Monthly Cumulative Energy Progression ({month_name})</div>", unsafe_allow_html=True)
     fig_energy = go.Figure()
@@ -843,20 +792,38 @@ if energy_view_mode == "Monthly Cumulative (Mon-Fri)":
     )
     st.plotly_chart(fig_energy, use_container_width=True)
 else:
-    st.markdown("<div class='graph-section-title'>📊 Daily Energy: Cumulative (kWh)</div>", unsafe_allow_html=True)
+    st.markdown("<div class='graph-section-title'>📊 Daily Energy Profile: Power Demand & Cumulative Energy (kWh)</div>", unsafe_allow_html=True)
     fig_energy = go.Figure()
     
-    # Cumulative Energy Consumed Since 08:00 AM (Single Y-Axis, kWh)
+    df_live_plot = df_live[df_live.index >= t_start]
+    
+    # 1. Non-Cumulative Power Demand (Left Y-Axis, kW)
+    fig_energy.add_trace(go.Scatter(
+        x=df_live_plot.index, y=df_live_plot['scheduled_hvac_power_kW'],
+        mode='lines', name='Baseline Power (kW)',
+        line=dict(color='#fdba74', width=2, dash='dot'),
+        yaxis='y'
+    ))
+    fig_energy.add_trace(go.Scatter(
+        x=df_live_plot.index, y=df_live_plot['predictive_hvac_power_kW'],
+        mode='lines', name='Predictive Power (kW)',
+        line=dict(color='#7dd3fc', width=2.5),
+        fill='tozeroy', fillcolor='rgba(125, 211, 252, 0.15)',
+        yaxis='y'
+    ))
+    
+    # 2. Cumulative Energy Consumed Since 08:00 AM (Right Y-Axis, kWh)
     fig_energy.add_trace(go.Scatter(
         x=df_live_plot.index, y=df_live_plot['sched_energy_cum_day'],
-        mode='lines', name='Baseline Cumulative',
-        line=dict(color='#ea580c', width=3, dash='dash')
+        mode='lines', name='Baseline Cumulative (kWh)',
+        line=dict(color='#ea580c', width=3.2, dash='dash'),
+        yaxis='y2'
     ))
     fig_energy.add_trace(go.Scatter(
         x=df_live_plot.index, y=df_live_plot['pred_energy_cum_day'],
-        mode='lines', name='Predictive Cumulative',
-        line=dict(color='#0284c7', width=3.5),
-        fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.10)'
+        mode='lines', name='Predictive Cumulative (kWh)',
+        line=dict(color='#0284c7', width=3.8),
+        yaxis='y2'
     ))
     
     fig_energy.add_vline(x=datetime.combine(active_date, active_time), line_width=2, line_color="#ef4444")
@@ -872,10 +839,19 @@ else:
         font=dict(color=TEXT_COLOR, size=12),
         xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=11, color=TEXT_COLOR), range=[t_start, t_end]),
         yaxis=dict(
-            title="Cumulative Energy (kWh)",
+            title="Power Demand (kW)",
             showgrid=True, 
             gridcolor=GRID_COLOR, 
-            tickfont=dict(size=11, color=TEXT_COLOR),
+            tickfont=dict(size=11, color='#0284c7'),
+            range=[0.0, 2.2],
+            zeroline=False
+        ),
+        yaxis2=dict(
+            title="Cumulative Energy (kWh)",
+            overlaying='y',
+            side='right',
+            showgrid=False,
+            tickfont=dict(size=11, color='#ea580c'),
             range=[0.0, y_energy_cum_upper],
             zeroline=False
         ),
