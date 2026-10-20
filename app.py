@@ -13,7 +13,7 @@ try:
 except Exception:
     pass
 
-# --- 1. PAGE CONFIGURATION & CLEAN MODERN CSS ---
+# --- 1. PAGE CONFIGURATION & CLEAN LIGHT THEME CSS ---
 st.set_page_config(
     page_title="Innovation Lab – HVAC Monitoring",
     layout="wide",
@@ -22,7 +22,7 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    /* 1. Base App & Root Canvas: Crisp Light Modern Theme (Matches Display) */
+    /* 1. Base App & Canvas: Crisp Clean Light Theme */
     .stApp, [data-testid="stAppViewContainer"], .main {
         background-color: #f8fafc !important;
         color: #0f172a !important;
@@ -34,8 +34,8 @@ st.markdown("""
     }
     
     .main .block-container {
-        padding-top: 1.2rem;
-        padding-bottom: 6rem;
+        padding-top: 1.0rem;
+        padding-bottom: 5rem;
         max-width: 98%;
     }
     
@@ -44,9 +44,9 @@ st.markdown("""
         background-color: #ffffff !important;
         border: 1.5px solid #e2e8f0 !important;
         border-radius: 14px;
-        padding: 12px 20px;
-        margin-bottom: 22px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        padding: 10px 20px;
+        margin-bottom: 18px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
     }
     
     /* 3. Metric Cards */
@@ -54,10 +54,10 @@ st.markdown("""
         background-color: #ffffff !important;
         border: 1.5px solid #e2e8f0 !important;
         border-radius: 18px;
-        padding: 18px 20px;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-        min-height: 205px;
-        height: auto;
+        padding: 16px 18px;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.03);
+        height: 100%;
+        min-height: 175px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -65,7 +65,7 @@ st.markdown("""
     }
     
     .card-top-title {
-        font-size: 18px;
+        font-size: 17px;
         font-weight: 800;
         color: #1e293b !important;
         display: flex;
@@ -74,9 +74,20 @@ st.markdown("""
         margin: 0;
         padding: 0;
     }
+
+    .graph-section-title {
+        font-size: 17px;
+        font-weight: 800;
+        color: #1e293b !important;
+        margin-top: 8px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
     
     .metric-main-val {
-        font-size: clamp(32px, 3.0vw, 44px);
+        font-size: clamp(30px, 2.6vw, 42px);
         font-weight: 900;
         color: #0f172a !important;
         line-height: 1.05;
@@ -84,7 +95,7 @@ st.markdown("""
     }
     
     .metric-label-muted {
-        font-size: 13.5px;
+        font-size: 12.5px;
         font-weight: 800;
         color: #64748b !important;
         text-transform: uppercase;
@@ -92,7 +103,7 @@ st.markdown("""
     }
     
     .metric-sub-unit {
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
         color: #64748b !important;
     }
@@ -100,18 +111,18 @@ st.markdown("""
     /* Distinct Compartment Boxes for Temperature Display */
     .temp-compartment {
         flex: 1;
-        background-color: #f8fafc;
+        background-color: #ffffff;
         border: 1.5px solid #e2e8f0;
         border-radius: 12px;
-        padding: 12px 6px;
+        padding: 10px 4px;
         text-align: center;
-        transition: all 0.2s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     }
     .temp-divider {
-        width: 2px;
-        background-color: #cbd5e1;
-        height: 64px;
-        margin: 0 6px;
+        width: 1.5px;
+        background-color: #e2e8f0;
+        height: 52px;
+        margin: 0 4px;
         align-self: center;
     }
 
@@ -119,14 +130,14 @@ st.markdown("""
     .comfort-card-box {
         background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
         border-radius: 18px;
-        padding: 16px;
+        padding: 14px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
-        min-height: 205px;
-        height: auto;
+        height: 100%;
+        min-height: 175px;
         box-shadow: 0 4px 18px rgba(22, 163, 74, 0.35);
         animation: comfortPulse 3s infinite ease-in-out;
         box-sizing: border-box;
@@ -146,8 +157,8 @@ st.markdown("""
     }
     .circular-gauge {
         position: relative;
-        width: 144px;
-        height: 144px;
+        width: 126px;
+        height: 126px;
         border-radius: 50%;
         display: flex;
         align-items: center;
@@ -156,8 +167,8 @@ st.markdown("""
     }
     .circular-gauge-inner {
         position: absolute;
-        width: 110px;
-        height: 110px;
+        width: 98px;
+        height: 98px;
         background: #ffffff !important;
         border-radius: 50%;
         display: flex;
@@ -290,7 +301,7 @@ with col_head_left:
     st.markdown("""
         <div style="line-height: 1.2;">
             <div style="font-size: 38px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px;">Innovation Lab – HVAC Monitoring</div>
-            <div style="font-size: 20px; font-weight: 700; color: #64748b; margin-top: 3px;">Occupancy Prediction Based Control</div>
+            <div style="font-size: 19px; font-weight: 700; color: #64748b; margin-top: 3px;">Occupancy Prediction Based Control</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -299,14 +310,14 @@ with col_head_mid:
     st.markdown(f"""
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 24px; margin-top: 6px;">
             <div style="text-align: right; line-height: 1.2;">
-                <div style="font-size: 16px; color: #64748b; font-weight: 800;">📅 {header_date_str}</div>
+                <div style="font-size: 15px; color: #64748b; font-weight: 800;">📅 {header_date_str}</div>
                 <div style="font-size: 28px; font-weight: 900; color: #0f172a;">{now_melbourne.strftime('%H:%M:%S')}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span class="circle-dot circle-green"></span>
                 <div style="line-height: 1.1;">
-                    <div style="font-size: 18px; font-weight: 900; color: #0f172a;">System Online</div>
-                    <div style="font-size: 13px; color: #64748b; font-weight: 600;">All sensors connected</div>
+                    <div style="font-size: 17px; font-weight: 900; color: #0f172a;">System Online</div>
+                    <div style="font-size: 12.5px; color: #64748b; font-weight: 600;">All sensors connected</div>
                 </div>
             </div>
         </div>
@@ -470,346 +481,12 @@ else:
 gauge_pct = min(100.0, max(0.0, disp_pct))
 gauge_deg = int((gauge_pct / 100.0) * 360)
 
-# --- 6. RESTRUCTURED TOP SUMMARY SECTION (4 BALANCED CARDS, CURRENT POWER REMOVED) ---
-# Column ratio: Occupancy (1.0), Temperature (1.45), Thermal Comfort (0.85), Energy Usage (2.1)
-kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1.0, 1.45, 0.85, 2.1])
-
-# 1. Occupancy Card
-if pred_occ > cur_occ:
-    trend_symbol = "↑"
-    trend_color = "#dc2626"  # Red for rise
-elif pred_occ < cur_occ:
-    trend_symbol = "↓"
-    trend_color = "#16a34a"  # Green for drop
-else:
-    trend_symbol = "="
-    trend_color = "#2563eb"  # Blue for equal
-
-with kpi_col1:
-    st.markdown(f"""
-    <div class="metric-card-box">
-        <div class="card-top-title">👥 Occupancy</div>
-        <div style="display: flex; justify-content: space-around; align-items: center; text-align: center; margin: auto 0;">
-            <div>
-                <div class="metric-label-muted">Current</div>
-                <div class="metric-main-val">{cur_occ}</div>
-                <div class="metric-sub-unit">people</div>
-            </div>
-            <div style="border-left: 1.5px solid #e2e8f0; height: 68px;"></div>
-            <div>
-                <div class="metric-label-muted">15 min ahead</div>
-                <div class="metric-main-val">
-                    {pred_occ} 
-                    <span style="font-size: 30px; font-weight: 900; color: {trend_color}; vertical-align: middle;">
-                        {trend_symbol}
-                    </span>
-                </div>
-                <div class="metric-sub-unit">people</div>
-            </div>
-        </div>
-        <div style="height: 4px;"></div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# 2. Temperature Card with Clear Distinct Compartments & Visible Boundaries
-with kpi_col2:
-    st.markdown(f"""
-    <div class="metric-card-box">
-        <div class="card-top-title">🌡️ Temperature (°C)</div>
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: auto 0;">
-            <div class="temp-compartment">
-                <div class="metric-label-muted" style="font-size: 12.5px;">Zone</div>
-                <div class="metric-main-val" style="color: #0284c7; font-size: 34px;">{zone_temp:.1f}</div>
-                <div class="metric-sub-unit" style="font-size: 11.5px;">°C Actual</div>
-            </div>
-            <div class="temp-divider"></div>
-            <div class="temp-compartment">
-                <div class="metric-label-muted" style="font-size: 12.5px;">Setpoint</div>
-                <div class="metric-main-val" style="color: #16a34a; font-size: 34px;">{setpoint_temp:.1f}</div>
-                <div class="metric-sub-unit" style="font-size: 11.5px;">°C Target</div>
-            </div>
-            <div class="temp-divider"></div>
-            <div class="temp-compartment">
-                <div class="metric-label-muted" style="font-size: 12.5px;">Outdoor</div>
-                <div class="metric-main-val" style="color: #ea580c; font-size: 34px;">{outdoor_temp:.1f}</div>
-                <div class="metric-sub-unit" style="font-size: 11.5px;">°C Ambient</div>
-            </div>
-        </div>
-        <div style="height: 4px;"></div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# 3. Thermal Comfort Hero Card
-with kpi_col3:
-    is_comfort = (22.8 <= zone_temp <= 25.8)
-    comfort_label = "COMFORTABLE" if is_comfort else "DEVIATION"
-    comfort_icon = "😊" if is_comfort else "⚠️"
-    bg_comfort = "linear-gradient(135deg, #16a34a 0%, #15803d 100%)" if is_comfort else "linear-gradient(135deg, #d97706 0%, #b45309 100%)"
-    st.markdown(f"""
-    <div class="comfort-card-box" style="background: {bg_comfort};">
-        <div style="font-size: 46px; line-height: 1.1; margin-bottom: 6px;">
-            {comfort_icon}
-        </div>
-        <div>
-            <div style="font-size: 12px; font-weight: 800; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.5px;">
-                Thermal Comfort
-            </div>
-            <div style="font-size: 20px; font-weight: 900; letter-spacing: 0.5px; line-height: 1.2; color: #ffffff;">
-                {comfort_label}
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# 4. Expanded & Spacious Energy Usage Summary Card (Side-by-Side & Large Radial Gauge)
-with kpi_col4:
-    st.markdown(f"""
-    <div class="metric-card-box">
-        <div class="card-top-title">{card_title}</div>
-        <div class="gauge-container" style="padding: 0 8px;">
-            <div style="display: flex; align-items: center; justify-content: space-around; flex: 1; text-align: center; gap: 20px;">
-                <div style="background-color: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; flex: 1;">
-                    <div class="metric-label-muted" style="font-size: 12.5px;">Predictive HVAC</div>
-                    <div style="font-size: 34px; font-weight: 900; color: #2563eb; line-height: 1.1; margin-top: 4px;">
-                        {disp_pred:.2f}
-                    </div>
-                    <div class="metric-sub-unit" style="font-size: 13px; font-weight: 800;">kWh consumed</div>
-                </div>
-                <div style="border-left: 2px solid #cbd5e1; height: 72px;"></div>
-                <div style="background-color: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; flex: 1;">
-                    <div class="metric-label-muted" style="font-size: 12.5px;">Scheduled Baseline</div>
-                    <div style="font-size: 34px; font-weight: 900; color: #d97706; line-height: 1.1; margin-top: 4px;">
-                        {disp_sched:.2f}
-                    </div>
-                    <div class="metric-sub-unit" style="font-size: 13px; font-weight: 800;">kWh baseline</div>
-                </div>
-            </div>
-            <!-- Large Prominent Radial Savings Ring Gauge -->
-            <div class="circular-gauge" style="background: conic-gradient(#16a34a 0deg {gauge_deg}deg, #e2e8f0 {gauge_deg}deg 360deg);">
-                <div class="circular-gauge-inner">
-                    <div style="font-size: 11px; font-weight: 900; color: #16a34a; text-transform: uppercase; letter-spacing: 0.8px;">SAVING</div>
-                    <div style="font-size: 32px; font-weight: 900; color: #0f172a; line-height: 1.05;">{disp_pct:.1f}%</div>
-                    <div style="font-size: 12px; font-weight: 700; color: #64748b; margin-top: 2px;">-{disp_saved:.2f} kWh</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-st.markdown("<div style='margin-bottom: 22px;'></div>", unsafe_allow_html=True)
-
-# --- 7. MAIN BODY: 3-COLUMN BALANCED GRAPH SECTION (OCCUPANCY | TEMPERATURE | ENERGY) ---
-grid_left, grid_mid, grid_right = st.columns([1.0, 1.0, 1.0])
-
+# Colors and chart styling for crisp light theme
 CHART_BG = "#ffffff"
 GRID_COLOR = "#f1f5f9"
 TEXT_COLOR = "#334155"
+CHART_HEIGHT = 260
 
-# 1. Left Column: Occupancy Tracking & 15 Minute Ahead Forecast
-with grid_left:
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>👥 Occupancy Tracking & 15 Min Forecast</div>", unsafe_allow_html=True)
-    
-    day_window_data = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
-    max_occ_day = max(day_window_data['occupancy_now'].max(), day_window_data['occupancy_forecast_15min'].max())
-    y_upper = max(8, int(max_occ_day) + 2) if pd.notna(max_occ_day) else 8
-
-    fig_occ = go.Figure()
-    fig_occ.add_trace(go.Scatter(
-        x=df_live.index, y=df_live['occupancy_forecast_15min'],
-        mode='lines', name='15 Min Forecast',
-        line=dict(color='#f97316', width=3, dash='dash')
-    ))
-    fig_occ.add_trace(go.Scatter(
-        x=df_live.index, y=df_live['occupancy_now'],
-        mode='lines', name='Actual Occupancy',
-        line=dict(color='#0284c7', width=3.5)
-    ))
-    fig_occ.add_vline(x=datetime.combine(active_date, active_time), line_width=2, line_color="#ef4444")
-
-    fig_occ.update_layout(
-        height=430,
-        margin=dict(l=25, r=25, t=10, b=25),
-        xaxis_title="", yaxis_title="People",
-        plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
-        font=dict(color=TEXT_COLOR, size=13),
-        xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[t_start, t_end]),
-        yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[0, y_upper], dtick=1),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1,
-            font=dict(size=11, color=TEXT_COLOR),
-            bgcolor="rgba(255, 255, 255, 0.9)",
-            bordercolor="#e2e8f0",
-            borderwidth=1
-        )
-    )
-    st.plotly_chart(fig_occ, use_container_width=True)
-
-# 2. Middle Column: Temperature Trend Curve (°C)
-with grid_mid:
-    st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>🌡️ Temperature Trend (°C)</div>", unsafe_allow_html=True)
-    fig_temp = go.Figure()
-    
-    # Comfort band shading (22.8 - 25.8 °C)
-    fig_temp.add_hrect(
-        y0=22.8, y1=25.8, line_width=0, fillcolor="#22c55e", opacity=0.16,
-        annotation_text="Comfort (22.8 - 25.8°C)", annotation_position="top right", annotation_font_size=11, annotation_font_color="#166534"
-    )
-    # Setpoint (24.0 °C)
-    fig_temp.add_hline(
-        y=24.0, line_dash="dash", line_color="#10b981", line_width=2, 
-        annotation_text="Setpoint (24°C)", annotation_position="top left", annotation_font_size=11, annotation_font_color="#047857"
-    )
-    # Zone Temperature
-    fig_temp.add_trace(go.Scatter(
-        x=df_live.index, y=df_live['predictive_room_temperature_C'],
-        mode='lines', name='Zone Temp',
-        line=dict(color='#0284c7', width=3.5)
-    ))
-    # Outdoor Temperature
-    fig_temp.add_trace(go.Scatter(
-        x=df_live.index, y=df_live['outdoor_temperature_C'],
-        mode='lines', name='Outdoor Temp',
-        line=dict(color='#ea580c', width=2.5, dash='dot')
-    ))
-    fig_temp.add_vline(x=datetime.combine(active_date, active_time), line_width=2, line_color="#ef4444")
-
-    fig_temp.update_layout(
-        height=430,
-        margin=dict(l=25, r=25, t=10, b=25),
-        xaxis_title="", yaxis_title="Temperature (°C)",
-        plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
-        font=dict(color=TEXT_COLOR, size=13),
-        xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[t_start, t_end]),
-        yaxis=dict(
-            showgrid=True, 
-            gridcolor=GRID_COLOR, 
-            tickfont=dict(size=12, color=TEXT_COLOR),
-            range=[22.0, 34.0],
-            dtick=2.0
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1,
-            font=dict(size=11, color=TEXT_COLOR),
-            bgcolor="rgba(255, 255, 255, 0.9)",
-            bordercolor="#e2e8f0",
-            borderwidth=1
-        )
-    )
-    st.plotly_chart(fig_temp, use_container_width=True)
-
-# 3. Right Column: Energy Graph
-with grid_right:
-    if energy_view_mode == "Monthly Cumulative (Mon-Fri)":
-        st.markdown(f"<div class='card-top-title' style='margin-bottom: 12px;'>📊 Monthly Cumulative ({month_name})</div>", unsafe_allow_html=True)
-        fig_energy = go.Figure()
-
-        dates_list = [d.strftime('%a %d %b') for d in daily_summary.index]
-
-        # Scheduled Baseline Cumulative (Business Days Only)
-        fig_energy.add_trace(go.Scatter(
-            x=dates_list, y=daily_summary['sched_kwh_cum'],
-            mode='lines+markers', name='Baseline Cumulative',
-            line=dict(color='#ea580c', width=3, dash='dash'),
-            marker=dict(size=5)
-        ))
-        
-        # Predictive HVAC Cumulative (Business Days Only)
-        fig_energy.add_trace(go.Scatter(
-            x=dates_list, y=daily_summary['pred_kwh_cum'],
-            mode='lines+markers', name='Predictive Cumulative',
-            line=dict(color='#0284c7', width=3.5),
-            fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.12)',
-            marker=dict(size=5)
-        ))
-
-        active_label = active_date.strftime('%a %d %b')
-        if active_label in dates_list:
-            fig_energy.add_vline(x=active_label, line_width=2, line_color="#ef4444")
-
-        y_max = daily_summary['sched_kwh_cum'].max() * 1.1 if not daily_summary.empty else 10.0
-
-        fig_energy.update_layout(
-            height=430,
-            margin=dict(l=25, r=25, t=10, b=25),
-            xaxis_title="", 
-            yaxis_title="Cumulative Energy (kWh)",
-            plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
-            font=dict(color=TEXT_COLOR, size=13),
-            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR)),
-            yaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[0.0, y_max], zeroline=False),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                font=dict(size=11, color=TEXT_COLOR),
-                bgcolor="rgba(255, 255, 255, 0.9)",
-                bordercolor="#e2e8f0",
-                borderwidth=1
-            )
-        )
-        st.plotly_chart(fig_energy, use_container_width=True)
-    else:
-        st.markdown("<div class='card-top-title' style='margin-bottom: 12px;'>📊 Daily Energy: Cumulative (kWh)</div>", unsafe_allow_html=True)
-        fig_energy = go.Figure()
-        
-        df_live_plot = df_live[df_live.index >= t_start]
-        
-        # Cumulative Energy Consumed Since 08:00 AM (Single Y-Axis, kWh)
-        fig_energy.add_trace(go.Scatter(
-            x=df_live_plot.index, y=df_live_plot['sched_energy_cum_day'],
-            mode='lines', name='Baseline Cumulative',
-            line=dict(color='#ea580c', width=3, dash='dash')
-        ))
-        fig_energy.add_trace(go.Scatter(
-            x=df_live_plot.index, y=df_live_plot['pred_energy_cum_day'],
-            mode='lines', name='Predictive Cumulative',
-            line=dict(color='#0284c7', width=3.5),
-            fill='tozeroy', fillcolor='rgba(2, 132, 199, 0.10)'
-        ))
-        
-        fig_energy.add_vline(x=datetime.combine(active_date, active_time), line_width=2, line_color="#ef4444")
-        
-        max_cum_e = day_window_data['sched_energy_cum_day'].max() if not day_window_data.empty else 5.0
-        y_energy_cum_upper = max(2.0, round(float(max_cum_e) + 0.6, 1))
-
-        fig_energy.update_layout(
-            height=430,
-            margin=dict(l=25, r=25, t=10, b=25),
-            xaxis_title="", 
-            plot_bgcolor=CHART_BG, paper_bgcolor=CHART_BG,
-            font=dict(color=TEXT_COLOR, size=13),
-            xaxis=dict(showgrid=True, gridcolor=GRID_COLOR, tickfont=dict(size=12, color=TEXT_COLOR), range=[t_start, t_end]),
-            yaxis=dict(
-                title="Cumulative Energy (kWh)",
-                showgrid=True, 
-                gridcolor=GRID_COLOR, 
-                tickfont=dict(size=12, color=TEXT_COLOR),
-                range=[0.0, y_energy_cum_upper],
-                zeroline=False
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1,
-                font=dict(size=11, color=TEXT_COLOR),
-                bgcolor="rgba(255, 255, 255, 0.9)",
-                bordercolor="#e2e8f0",
-                borderwidth=1
-            )
-        )
-        st.plotly_chart(fig_energy, use_container_width=True)
-
-# Bottom spacing to keep the auto-scroll loop smooth on all TV resolutions
-st.markdown("<div style='height: 120px;'></div>", unsafe_allow_html=True)
+day_window_data = df_day[(df_day.index >= t_start) & (df_day.index <= t_end)]
+max_occ_day = max(day_window_data['occupancy_now'].max(), day_window_data['occupancy_forecast_15min'].max())
+y_upper = max(8
